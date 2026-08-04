@@ -5,7 +5,8 @@ Devcon 8 (Mumbai, 3 to 6 November 2026). The question underneath all of it: can 
 twenty-stage conference be streamed over [Swarm](https://www.ethswarm.org), and what
 would it actually take.
 
-**Read it as a site: <https://solar-punk-ltd.github.io/devcon-streaming-partnership/>**
+**The architecture explorer is live at
+<https://solar-punk-ltd.github.io/devcon-streaming-partnership/>**
 
 These are working documents, not a finished proposal. They were written over three
 weeks and the design changed underneath them more than once, so the tables below say
@@ -79,8 +80,8 @@ npm --prefix arch-explorer run build
 
 The build emits a single self-contained HTML file to `arch-explorer/dist/`.
 
-GitHub Pages serves `docs/`, so the published explorer is a copy at `docs/explorer.html`.
-After changing the model, refresh it with:
+GitHub Pages serves `docs/`, and the published site is the explorer itself at
+`docs/index.html`. After changing the model, refresh it with:
 
 ```bash
 npm --prefix arch-explorer run pages

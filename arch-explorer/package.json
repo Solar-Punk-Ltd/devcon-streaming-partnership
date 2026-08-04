@@ -8,7 +8,7 @@
     "test": "node --test",
     "build": "node tools/bundle.js",
     "dev": "node tools/serve.js",
-    "pages": "node tools/bundle.js && cp dist/devcon8-architecture.html ../docs/explorer.html"
+    "pages": "node tools/bundle.js && cp dist/devcon8-architecture.html ../docs/index.html"
   },
   "engines": {
     "node": ">=20"
