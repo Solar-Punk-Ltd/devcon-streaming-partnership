@@ -9,7 +9,7 @@
 
 Solar Punk builds live video streaming on **Swarm**, Ethereum's decentralized storage network. Our pipeline takes a standard broadcast feed, writes every second of it to Swarm in real time, and plays it back to viewers' browsers. For Devcon 8 we propose to be your decentralized streaming provider: your team produces the program feed on-site, and we handle everything from there: decentralized delivery, an embeddable multi-stage player, and a permanent, decentralized archive of every session.
 
-We are also being straight about where the technology stands. The pipeline is proven today at single-stream scale, with real, tested recovery from infrastructure failures. Scaling it to a full multi-stage conference entirely over Swarm, without a CDN, is the frontier we are actively proving out. That load testing is already under way, ahead of any go-live commitment.
+We are also being straight about where the technology stands. The pipeline is proven today at single-stream scale, with real, tested recovery from infrastructure failures. Scaling it to a full multi-stage conference is the frontier we are actively proving out, and that load testing is already under way ahead of any go-live commitment. Swarm is the origin, the storage and the archive throughout. A cache sits in front of it so the bulk of the audience is served affordably, and any viewer who prefers can fetch the identical hash-verified bytes from the network directly.
 
 ---
 
@@ -60,9 +60,9 @@ We would rather be clear than oversell.
 
 ## 5. Transparent about scale
 
-Delivery stays on Swarm. That is the mission-aligned choice, and it is also genuinely pioneering, which means the honest position is this:
+The content stays on Swarm, which is the mission-aligned choice and also genuinely pioneering, which means the honest position is this:
 
-- Serving a full conference audience directly over Swarm, without a CDN, is not yet a measured number.
+- How much of a full conference audience can be served straight from the network, rather than from the cache in front of it, is not yet a measured number.
 - We are already **running this load testing**, ahead of go-live, and will confirm a concurrency figure from it rather than promise one up front.
 - No public go-live commitment would be made until that validation passes.
 
