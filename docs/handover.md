@@ -142,7 +142,7 @@ Decentralized streaming is not new to Devcon. Devcon 6 was streamed on a decentr
 
 ### E. Audience, scale & latency
 
-17. **[Blocker]** What audience should we design for: expected concurrent viewers (total and per stage), and a stress ceiling you want us to load-test to? (Devcon 6 saw ~60k total live viewers over 4 days. Concurrent peaks are far lower. Our current design point: 5,000 concurrent, stress-tested to 20,000.)
+17. **[Blocker]** What audience should we design for: expected concurrent viewers (total and per stage), and a stress ceiling you want us to load-test to? (Devcon 6 saw ~60k total live viewers over 4 days. Concurrent peaks are far lower. Our current design point: 4,000 concurrent expected, built and load-tested to hold 40,000.)
 18. **[Before build]** Geographic mix assumptions (India-heavy + global?). This drives gateway/node placement.
 19. **[Before build]** Latency requirement: is standard latency (~10-15 s glass-to-glass) acceptable, or is low-latency (6 s or less) a hard requirement? Any interactivity (live Q&A voting) that depends on it?
 20. **[Before event]** Rewind/DVR on the live edge: required or nice-to-have?
@@ -152,7 +152,7 @@ Decentralized streaming is not new to Devcon. Devcon 6 was streamed on a decentr
 21. **[Blocker]** Where do viewers watch: embedded on devcon.org / a live.devcon.org page we build / the Devcon app / all of these? Who builds and hosts the surrounding page?
 22. **[Before build]** Player requirements: multi-stage switcher, quality selector, captions, chat integration (which system?), schedule/now-playing metadata (from which source, your program API?).
 23. **[Before build]** Captions/subtitles: required? Which languages? Who supplies live transcription (a vendor, or should we include it)?
-24. **[Before build]** Delivery-model alignment: our delivery is decentralized-only (Swarm, no web2 CDN or backstop from us). Please confirm the EF is aligned on this.
+24. **[Before build]** Delivery-model alignment. Swarm is the origin, the storage and the archive. A CDN sits in front of nodes we run, because content-addressed segments are immutably cacheable and that is what makes serving a conference audience affordable. Any viewer who prefers can fetch the identical hash-verified bytes from the network directly. We also build our own dormant standby path in case Swarm delivery has a bad day, and it is ours rather than a rented platform. Please confirm the EF is comfortable with a cache in front of a decentralized origin, and tell us if you would rather we described it differently in public messaging.
 25. **[Before event]** Accessibility requirements beyond captions (keyboard navigation, screen-reader labels, WCAG target)?
 
 ### G. Archive
