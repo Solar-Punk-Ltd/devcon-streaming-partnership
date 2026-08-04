@@ -1,8 +1,29 @@
 # Devcon 8 Mumbai: Streaming Architecture Plan
 
-> **Status:** internal working plan, v1, 2026-07-29. Owner: Levente Kiss.
+> **Status:** working plan, v1, 2026-07-29. Owner: Levente Kiss.
 > **Purpose:** decide yes or no on streaming all of Devcon 8, and if yes, be the architectural outlay EF asked for.
 > **Deadline:** EF wants an answer in 2 to 3 weeks, so roughly **mid-August 2026**. Event is **3 to 6 Nov 2026**, about 14 weeks out.
+
+> [!IMPORTANT]
+> **Kept as written. Superseded on components, not on reasoning.**
+>
+> An architecture review on 2026-08-03 changed a number of the component
+> decisions below. The reasoning in this document, the Swarm capacity
+> analysis, the failure and threat models, the cost model and the go or
+> no-go gates, is why the current design looks the way it does and remains
+> the best account of it. The components are not current.
+>
+> What changed: the publish lease is gone, because two independent lanes make
+> a forked feed impossible and leave nothing to arbitrate. The three shared
+> origin gateways are gone, replaced by one prefetch node per feed so that no
+> shared component sits behind the stages. The coverage fleet is gone,
+> replaced by four levels of 160 prefetch nodes reaching all 512
+> neighborhoods. The rented web2 mirror is gone, replaced by a standby stack
+> we build ourselves. Pods carrying four to five stages each are gone, in
+> favour of per-stage isolation. The viewer target moved from 20,000 to a
+> 40,000 ceiling against an expected 4,000.
+>
+> The current component design is in [`../arch-explorer/`](../arch-explorer/).
 
 ---
 
