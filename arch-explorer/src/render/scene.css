@@ -1,0 +1,657 @@
+/* ═══ Canvas ═════════════════════════════════════════════════════════════════
+   Edges are SVG under an HTML layer of cards, both inside one transformed
+   world so a single pan or zoom moves them together. Cards stay HTML so their
+   text is real text: selectable, wrapping, and crisp at any scale. */
+
+#stage {
+  grid-column: 3;
+  grid-row: 2;
+  position: relative;
+  overflow: hidden;
+  background: var(--canvas);
+  touch-action: none;
+  cursor: grab;
+}
+#stage[data-panning="true"] { cursor: grabbing; }
+
+/* A dot grid that scales with the camera, so zoom has something to bite on. */
+#stage::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background-image: radial-gradient(circle, var(--grid) 1px, transparent 1px);
+  background-size: var(--grid-step, 26px) var(--grid-step, 26px);
+  background-position: var(--grid-x, 0) var(--grid-y, 0);
+  pointer-events: none;
+}
+
+#world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+#wires, #labels { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+#labels { z-index: 4; }
+
+/* ── Bands ────────────────────────────────────────────────────────────── */
+
+/* A boundary in the C4 sense: it exists to say these things belong together.
+   Drawn behind the wires, never clickable, and quiet enough that it reads as
+   ground rather than as another box. */
+.band {
+  position: absolute;
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--panel) 22%, transparent);
+  pointer-events: none;
+}
+.band-tag {
+  position: absolute;
+  top: -9px;
+  left: 18px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: var(--canvas);
+  font: 600 10px/1.7 var(--sans);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* ── Cards ────────────────────────────────────────────────────────────── */
+
+.node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  padding: 11px 13px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--panel);
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color .18s var(--ease), box-shadow .18s var(--ease),
+              opacity .28s var(--ease), transform .18s var(--ease), filter .28s var(--ease),
+              left .32s var(--ease), top .32s var(--ease);
+}
+/* A card appearing from inside a box it was hidden in grows out of it rather
+   than blinking into place. */
+@keyframes unfold { from { opacity: 0; transform: scale(.9); } }
+.node { animation: unfold .26s var(--ease); }
+.node:hover { border-color: var(--edge-strong); box-shadow: var(--shadow-2); transform: translateY(-1px); }
+.node[data-selected="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-lo), var(--shadow-2);
+}
+
+/* External things are drawn as not ours: dashed, flatter, cooler. */
+.node[data-external="true"] { border-style: dashed; background: var(--panel-2); }
+.node[data-external="true"]:not([data-selected="true"]):not([data-act="true"]) { box-shadow: none; }
+
+/* A system reads as a container rather than a unit of work. */
+.node[data-shape="system"] { border-radius: 11px; }
+
+/* An actor carries a head tab, the way a stick figure reads on a C4 sheet
+   without needing an actual stick figure. */
+.node[data-shape="actor"] { border-radius: 11px 11px var(--r) var(--r); }
+.node[data-shape="actor"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 3px;
+  background: var(--edge);
+  opacity: .5;
+}
+
+/* A store gets a cylinder cap: the curved band that says database at a glance. */
+.node[data-shape="cylinder"] { padding-top: 15px; }
+.node[data-shape="cylinder"]::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 7px;
+  right: 7px;
+  height: 9px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  opacity: .85;
+}
+
+/* A queue gets its stacked slots. */
+.node[data-shape="stack"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: repeating-linear-gradient(var(--edge) 0 5px, transparent 5px 9px);
+  opacity: .5;
+}
+
+.n-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.node[data-badged="true"] .n-head { padding-right: 34px; }
+/* A card wears where it runs on its left edge, and its icon takes the same
+   hue. Quiet enough to sit under the accent, loud enough to group by. */
+.node[data-place]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--place);
+  opacity: .85;
+}
+.node[data-place] .n-icon { color: var(--place); }
+.n-icon { color: var(--ink-3); display: grid; place-items: center; flex: none; }
+.node[data-selected="true"] .n-icon { color: var(--accent); }
+.node[data-selected="true"][data-place]::after,
+.node[data-act="true"][data-place]::after { background: var(--accent); opacity: 1; }
+.n-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -.008em;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.n-desc {
+  overflow-wrap: anywhere;
+  margin: 5px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* The technology line is monospace and prefixed with the object's type, which
+   is the single detail that makes a box read as an engineering artifact
+   rather than a shape on a slide. The count rides the same line, right
+   aligned, so it costs no card height. */
+.n-foot {
+  margin-top: auto;
+  padding-top: 7px;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+}
+.n-tech {
+  flex: 1;
+  min-width: 0;
+  font: 500 10px/1.4 var(--mono);
+  color: var(--ink-3);
+  letter-spacing: -.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* How many of these run, always on, with no mode to remember. The dot is what
+   covers the loss of one. It is deliberately small: the left edge rail already
+   carries placement, and two loud colours on one card group by nothing. */
+.n-mult, .fh-mult {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 650 10.5px/1.4 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.n-mult::before, .fh-mult::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--res, var(--edge));
+  flex: none;
+}
+.fh-mult { margin-left: 2px; }
+.node[data-selected="true"] .n-mult, .node[data-act="true"] .n-mult { color: var(--accent-ink); }
+
+/* Corner affordance: how many things are inside, and that you can go in. */
+.n-drill {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 19px;
+  padding: 0 5px;
+  border: 1px solid var(--accent-mid);
+  border-radius: 5px;
+  background: var(--accent-lo);
+  color: var(--accent);
+  font: 600 10px/1 var(--mono);
+  cursor: pointer;
+  opacity: .82;
+  transition: opacity .15s var(--ease), background .15s var(--ease);
+}
+.n-drill:hover { opacity: 1; background: var(--accent-mid); }
+
+/* Tag stripes, painted along the bottom edge when an overlay is active. One
+   band per tag, so a card carrying three technologies shows three. */
+.n-stripes {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  display: flex;
+}
+.n-stripes span { flex: 1; }
+
+/* ── Selection reaches its connections ────────────────────────────────── */
+
+/* A selection that only lights itself answers nothing. What matters about a
+   component is what it is wired to, so that is what lights up with it. */
+.node[data-wired="true"] {
+  border-color: var(--accent-mid);
+  box-shadow: 0 0 0 2px var(--accent-lo);
+}
+.wire[data-wired="true"] { stroke: var(--accent); stroke-width: 2.4; opacity: 1; }
+.wire-tip[data-wired="true"] { fill: var(--accent); opacity: 1; }
+.wire-label[data-wired="true"] { fill: var(--accent-ink); font-weight: 650; opacity: 1; }
+.wire-plate[data-wired="true"] { opacity: 1; }
+
+/* ── Dimming ──────────────────────────────────────────────────────────── */
+
+/* Anything not taking part in the current step or filter recedes rather than
+   disappearing, so the shape of the whole system stays readable behind the
+   part being talked about. */
+.node[data-dim="true"] { opacity: .28; }
+.node[data-dim="true"]:not([data-selected="true"]) { box-shadow: none; }
+/* Hover and focus restore it fully. A card at .17 is unreadable, so half
+   measures buy nothing: either it is receded or you are looking at it. */
+.node[data-dim="true"]:hover,
+.node[data-dim="true"]:focus-visible { opacity: 1; transform: none; }
+
+.node[data-act="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-lo), var(--shadow-2);
+  z-index: 3;
+}
+#stage[data-mode="incident"] .node[data-act="true"] {
+  border-color: var(--risk);
+  box-shadow: 0 0 0 3px var(--risk-lo), var(--shadow-2);
+}
+#stage[data-mode="incident"] .node[data-act="true"] .n-icon { color: var(--risk); }
+
+/* ── Edges ────────────────────────────────────────────────────────────── */
+
+.wire {
+  fill: none;
+  stroke: var(--edge);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transition: stroke .25s var(--ease), opacity .28s var(--ease), stroke-width .2s var(--ease);
+}
+.wire[data-strong="true"] { stroke: var(--edge-strong); stroke-width: 2.4; }
+
+/* The signal chain is the thing the diagram is about, so it is the only kind
+   drawn solid and at full weight. Everything else is support and says so. */
+.wire[data-kind="control"] { stroke-dasharray: 7 5; stroke: var(--link); opacity: .85; }
+.wire[data-kind="observe"] { stroke-dasharray: 1.5 5; stroke-linecap: round; opacity: .7; }
+.wire-tip[data-kind="control"] { fill: var(--link); opacity: .85; }
+.wire-tip[data-kind="observe"] { opacity: .7; }
+.wire-label[data-kind="control"] { fill: var(--link); }
+.wire-label[data-kind="observe"] { font-style: italic; }
+.wire[data-dim="true"] { opacity: .18; }
+.wire[data-act="true"] { stroke: var(--accent); stroke-width: 2.6; }
+#stage[data-mode="incident"] .wire[data-act="true"] { stroke: var(--risk); }
+
+.wire-hit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
+
+.wire-tip { fill: var(--edge); transition: fill .25s var(--ease), opacity .28s var(--ease); }
+.wire-tip[data-strong="true"] { fill: var(--edge-strong); }
+.wire-tip[data-dim="true"] { opacity: .18; }
+.wire-tip[data-act="true"] { fill: var(--accent); }
+#stage[data-mode="incident"] .wire-tip[data-act="true"] { fill: var(--risk); }
+
+.wire-label {
+  font: 500 10px/1 var(--sans);
+  fill: var(--ink-2);
+  text-anchor: middle;
+  transition: opacity .28s var(--ease), fill .25s var(--ease);
+}
+.wire-plate {
+  fill: var(--canvas);
+  stroke: var(--line-soft);
+  stroke-width: .8;
+  transition: opacity .28s var(--ease);
+}
+.wire-plate[data-dim="true"] { opacity: .18; }
+.wire-label[data-dim="true"] { opacity: .12; }
+.wire-label[data-act="true"] { fill: var(--accent); font-weight: 650; }
+#stage[data-mode="incident"] .wire-label[data-act="true"] { fill: var(--risk); }
+
+/* Packets travelling the active connection. The dash offset animates rather
+   than a transform, so the motion follows the curve exactly. */
+.wire-flow {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 13;
+  vector-effect: non-scaling-stroke;
+  animation: packet 1.15s linear infinite;
+}
+#stage[data-mode="incident"] .wire-flow { stroke: var(--risk); }
+@keyframes packet { to { stroke-dashoffset: -13.1; } }
+
+/* ── Containment frames, used by the systems view ─────────────────────── */
+
+.frame {
+  position: absolute;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 30%, transparent);
+  transition: border-color .2s var(--ease), background .2s var(--ease),
+              opacity .28s var(--ease), left .32s var(--ease), top .32s var(--ease),
+              width .32s var(--ease), height .32s var(--ease);
+}
+/* Each level in is a shade lighter, so depth reads without counting borders. */
+.frame[data-depth="1"] { background: color-mix(in srgb, var(--panel) 46%, transparent); }
+.frame[data-depth="2"] { background: color-mix(in srgb, var(--panel) 62%, transparent); }
+.frame[data-dim="true"] { opacity: .3; }
+.frame:hover { border-color: var(--edge); }
+.frame[data-selected="true"] { border-color: var(--accent); border-style: solid; background: var(--accent-lo); }
+.frame-head {
+  max-width: calc(100% - 24px);
+  min-width: 0;
+  position: absolute;
+  top: 9px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 5px;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.frame-head:hover { color: var(--ink); border-color: var(--edge); }
+.frame-head > span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.frame-head .fh-count { font: 500 10px/1 var(--mono); color: var(--ink-3); }
+.frame-head .fh-close { display: grid; place-items: center; color: var(--ink-3); margin-left: 2px; }
+.frame-head:hover .fh-close { color: var(--accent-ink); }
+
+/* ── Floating canvas controls ─────────────────────────────────────────── */
+
+.dock {
+  position: absolute;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-1);
+}
+.dock-zoom { right: 14px; top: 14px; }
+.dock-btn {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background .14s var(--ease), color .14s var(--ease);
+}
+.dock-btn:hover { background: var(--panel-3); color: var(--ink); }
+.dock-zoom .zoom-read {
+  min-width: 44px;
+  text-align: center;
+  font: 500 11px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+/* ── Overlay chip bar ─────────────────────────────────────────────────── */
+
+#overlays {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  right: 120px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  pointer-events: none;
+}
+#overlays > * { pointer-events: auto; }
+#app.narrating #overlays { opacity: 0; visibility: hidden; transition: opacity .2s var(--ease); }
+
+.ov-groups { display: flex; gap: 5px; flex-wrap: wrap; }
+.ov-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color .15s var(--ease), color .15s var(--ease), background .15s var(--ease);
+}
+.ov-group:hover { color: var(--ink); border-color: var(--edge); }
+.ov-group[aria-pressed="true"] { background: var(--accent-lo); border-color: var(--accent-mid); color: var(--accent-ink); }
+
+.ov-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-1);
+  animation: rise .2s var(--ease);
+}
+/* One sided on purpose. A two sided keyframe freezes at its `from` state in a
+   hidden document, which left the dock, the filter bar and every toast stuck
+   at opacity 0 in an embedded pane. Same trap as requestAnimationFrame. */
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+
+.ov-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 25px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color .14s var(--ease), color .14s var(--ease), opacity .14s var(--ease);
+}
+.ov-tag:hover { color: var(--ink); border-color: var(--edge); }
+.ov-tag[data-state="solo"] { border-color: var(--tag); color: var(--ink); font-weight: 560; }
+.ov-tag[data-state="hidden"] { opacity: .62; text-decoration: line-through; }
+.ov-swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.ov-tag .ov-n { font: 500 10.5px/1 var(--mono); color: var(--ink-3); }
+
+/* ── Scenario dock ────────────────────────────────────────────────────── */
+
+#scenario {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  /* `translate` applies before `transform`, so the rise animation can offset
+     this element without cancelling the centring. */
+  translate: -50% 0;
+  z-index: 9;
+  width: min(720px, calc(100% - 28px));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 95%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+  animation: rise .24s var(--ease);
+}
+#scenario[hidden] { display: none; }
+#scenario[data-kind="incident"] { border-color: color-mix(in srgb, var(--risk) 40%, var(--line)); }
+
+.sc-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px 9px 13px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.sc-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font: 600 9.5px/1.7 var(--sans);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: var(--accent-lo);
+  color: var(--accent-ink);
+}
+#scenario[data-kind="incident"] .sc-kind { background: var(--risk-lo); color: var(--risk); }
+.sc-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.sc-tools { margin-left: auto; flex: none; display: flex; align-items: center; gap: 3px; }
+@media (max-width: 520px) { .sc-kind span { display: none; } .sc-kind { padding: 2px 5px; } }
+.sc-count {
+  font: 500 11px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  padding: 0 6px;
+}
+
+.sc-body { display: flex; gap: 13px; padding: 11px 13px 13px; }
+.sc-text { flex: 1; margin: 0; font-size: 13.5px; line-height: 1.58; color: var(--ink-2); min-width: 0; }
+.sc-text strong { color: var(--ink); font-weight: 620; }
+
+.sc-runbook {
+  margin-top: 8px;
+  padding: 9px 11px;
+  border-left: 2px solid var(--risk);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--risk-lo);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+/* Step rail: one tick per step, filled up to where you are. Doubles as a
+   scrubber, so a long incident can be jumped into at the interesting part. */
+.sc-steps { display: flex; gap: 3px; padding: 0 13px 11px; }
+.sc-step {
+  flex: 1;
+  height: 4px;
+  min-width: 6px;
+  border: 0;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--line);
+  cursor: pointer;
+  transition: background .2s var(--ease), transform .16s var(--ease);
+}
+.sc-step:hover { transform: scaleY(1.9); }
+.sc-step[data-done="true"] { background: var(--accent-mid); }
+.sc-step[data-current="true"] { background: var(--accent); }
+#scenario[data-kind="incident"] .sc-step[data-done="true"] { background: color-mix(in srgb, var(--risk) 45%, transparent); }
+#scenario[data-kind="incident"] .sc-step[data-current="true"] { background: var(--risk); }
+
+/* ── Impact view furniture ────────────────────────────────────────────── */
+
+.impact-col {
+  position: absolute;
+  top: 0;
+  font: 600 10.5px/1 var(--sans);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.impact-col b {
+  font: 600 15px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  margin-right: 6px;
+}
+.node[data-focus="true"] {
+  border-color: var(--accent);
+  border-width: 2px;
+  box-shadow: 0 0 0 5px var(--accent-lo), var(--shadow-2);
+}
+.hop {
+  font: 500 10px/1 var(--mono);
+  fill: var(--ink-3);
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--canvas);
+  stroke-width: 4;
+  stroke-linejoin: round;
+}
+
+/* ── Toast ────────────────────────────────────────────────────────────── */
+
+#toast {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 20;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 95%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-2);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  animation: rise .2s var(--ease);
+}
+#toast[hidden] { display: none; }

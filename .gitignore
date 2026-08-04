@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+*.log
+.screenshots/
+
+# Local editor and agent preferences, not shared
+.claude/settings.local.json

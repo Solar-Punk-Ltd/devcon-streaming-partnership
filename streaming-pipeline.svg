@@ -1,0 +1,87 @@
+<svg width="960" height="560" viewBox="0 0 960 560" role="img" xmlns="http://www.w3.org/2000/svg" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+<title>Streaming pipeline on Swarm</title>
+<desc>A production block owned by the AV vendor (OBS, or cameras plus an encoder) captures and encodes, then hands off over SRT or RTMP into the media engine (SRS or OME: ingest, transcode, package), then the Swarm uploader. Swarm provides origin, storage, delivery and archive, replacing the origin server and CDN. Playback in the browser via custom hls.js and the bee client.</desc>
+<defs>
+  <marker id="elb" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="#C0C5C8"/>
+  </marker>
+</defs>
+
+<rect x="0" y="0" width="960" height="560" rx="10" fill="#F7F7F4" stroke="#ECECE9"/>
+
+<text x="48" y="64" font-size="32" font-weight="700" fill="#22313F">Streaming pipeline on Swarm</text>
+<text x="48" y="94" font-size="14.5" font-style="italic" fill="#97A1AA">Standard streaming stages. Swarm replaces the origin server and the CDN.</text>
+
+<g transform="translate(783,32) scale(0.0305)" fill="#E8730F">
+<path d="M0 665.01V965l260 150 260-150.01V664.96L260 515 0 665.01zM855 515 595 665v299.99L855 1115l260-150.01V664.95L855 515zM817.32 300.27l-129.91-75.25-.13-149.98L557.5 0 297.68 150.01V450L557.5 600l259.82-150V300.27z"></path><path d="m817.32 300.27 129.91-75.3V75L817.52 0 687.28 75.04l130.24 74.83-.2 150.4z"></path><g><path d="m2415.53 300.74-63.56 442.98c-.1.73-1.16.72-1.25-.01l-55.85-442.95a.63.63 0 0 0-.63-.55h-158.41a.64.64 0 0 0-.63.55l-55.85 442.99c-.09.73-1.15.74-1.25.01l-63.56-443.01a.63.63 0 0 0-.63-.54h-96.57a.63.63 0 0 0-.62.73l80.61 512.59c.05.31.31.53.62.53h158.16c.32 0 .59-.24.63-.55l57.68-442.16c.1-.73 1.16-.73 1.25 0l57.67 442.16c.04.31.31.55.63.55h158.16c.31 0 .58-.23.62-.53l80.61-512.59a.63.63 0 0 0-.62-.73h-96.58a.64.64 0 0 0-.63.54ZM4189.53 324.76c-22.01-25.59-53.37-38.57-93.2-38.57-50.94 0-89.06 22.89-113.39 68.06h-.38c-6.8-18.86-18-34.68-33.35-47.1-17.22-13.9-39.1-20.95-65.04-20.95-24.32 0-45.81 6.04-63.86 17.96-15.22 10.05-27.46 24.82-36.48 44.02v-47.33a.63.63 0 0 0-.63-.63h-94.28a.63.63 0 0 0-.63.63v512.58c0 .35.28.63.63.63h94.28c.35 0 .63-.28.63-.63V463.06c0-25.95 5.98-47.08 17.77-62.81 11.37-15.15 27.25-22.51 48.55-22.51 17.46 0 30.98 6.01 41.33 18.38 10.75 12.85 15.98 28.86 15.98 48.93v368.38c0 .35.28.63.63.63h94.28c.35 0 .63-.28.63-.63V469.06c0-31.75 6.22-55.29 18.48-69.94 12.04-14.39 27.36-21.39 46.83-21.39 20.53 0 34.89 6.16 43.91 18.83 9.55 13.45 14.39 31.1 14.39 52.48v364.37c0 .35.28.63.63.63h94.92V423.03c0-39.98-10.98-73.04-32.64-98.27ZM3084.49 758.16l-59.73 66.7a.64.64 0 0 1-.9.06l-105.21-91.18a.65.65 0 0 0-.75-.07l-125.83 73.49c-21.21 12.12-43.43 18.18-67.66 18.18-35.35 0-67.66-13.12-95.94-38.37-27.27-26.26-41.41-58.58-41.41-97.96 0-47.46 25.25-93.92 68.67-118.16l254.16-146.24c.2-.11.32-.33.32-.56v-32.32a.64.64 0 0 0-.64-.64h-296.62a.64.64 0 0 1-.64-.64v-89.59c0-.36.29-.64.64-.64h387.51c.36 0 .64.29.64.64v383.82c0 .19.08.36.22.49l83.1 72.09c.27.24.3.65.06.92Zm-337.87-29.78 163.27-94.74c.2-.12.32-.33.32-.56V530.54c0-.5-.54-.8-.96-.56L2701.17 649.6c-15.15 9.09-23.23 22.22-23.23 39.39 0 25.24 22.22 45.45 45.45 45.45 9.09 0 16.15-2.02 23.23-6.07ZM3538.58 336.12c-32.96-32.95-72.9-49.93-119.84-49.93-55.69 0-100.48 21.79-134.38 65.37a.61.61 0 0 1-.91.08l-59.94-55.04a.63.63 0 0 0-.9.04l-59.07 65.96a.64.64 0 0 0 .05.9l85.2 77.28c.13.12.21.29.21.47V723.3c0 .35-.29.64-.64.64h-84.66a.64.64 0 0 0-.64.64v88.59c0 .35.29.64.64.64h305.1c.35 0 .64-.29.64-.64v-88.59a.64.64 0 0 0-.64-.64h-129.29a.64.64 0 0 1-.64-.64V460.25c0-41.97 30.45-79.89 72.23-83.83 47.34-4.47 87.54 33.06 87.54 79.52v29.32c0 .35.29.64.64.64h88.6c.35 0 .64-.29.64-.64v-29.32c0-46.93-16.98-86.88-49.93-119.83ZM1823.98 600.5c-6.22-14.51-15.66-27.21-26.99-36.45-10.58-10.57-24.11-18.85-42.32-25.91-18.6-8.75-35.87-13.85-48.84-17.31-16.85-4.49-35.01-9.21-55.39-13.09-39.83-7.96-69.35-17.88-87.71-29.47-17.93-11.33-27.02-26.26-27.02-44.41 0-21.06 7.64-35.8 24.2-46.53 23.29-15.09 52.03-19.17 79.01-13.62 26.1 5.37 49.63 20.56 69.41 37.92 4.02 3.53 45.13 41.31 44.37 42.17l59.09-66.95s-28.44-28.8-41.92-40.54c-32.14-27.98-70.36-51.61-113.41-58.4-42.77-6.75-91.43-.29-129.98 19.65a172.67 172.67 0 0 0-29.97 19.71c-34.32 28.08-51.71 64.95-51.71 109.61s14.69 79.88 44.84 101.71c28.29 21.22 68.98 37.67 120.97 48.89 45.94 9.77 79.31 19.77 99.4 29.8 19.12 8.19 28.41 21.3 28.41 40.07 0 24.19-9.75 42.5-29.07 54.46-43.51 26.94-103.96 25.74-147.95.48-18.97-10.9-34.68-26.71-51.3-40.74-12.75-10.88-24.81-22.56-37.09-33.97-.14-.13-.28-.26-.48-.52l-57.52 69.28c-.17.21 28.12 26.19 30.59 28.44 38.88 35.44 80.79 64.78 133.12 75.62a280.5 280.5 0 0 0 56.85 5.65c56.29 0 103.73-14.81 140.95-43.99 39.04-29.79 58.84-71.09 58.84-122.73 0-17.07-3.97-34.03-11.37-48.82Z"></path></g>
+</g>
+
+<text x="185" y="132" font-size="11.5" font-style="italic" fill="#9AA3AB" text-anchor="middle">AV vendor</text>
+<text x="355" y="133" font-size="11" font-weight="600" fill="#E8730F" text-anchor="middle">SRT (preferred) / RTMP</text>
+
+<rect x="60" y="140" width="250" height="112" rx="3" fill="#F1F1EE" stroke="#DDDFDD"/>
+<text x="74" y="162" font-size="13.5" font-weight="600" letter-spacing="0.5" fill="#E8730F">PRODUCTION</text>
+<rect x="74" y="192" width="105" height="46" rx="3" fill="#FFFFFF" stroke="#E4E6E4"/>
+<text x="126" y="212" font-size="11.5" font-weight="600" fill="#E8730F" text-anchor="middle">CAPTURE</text>
+<text x="126" y="228" font-size="9.5" fill="#7E8890" text-anchor="middle">camera / screen</text>
+<polygon points="180,211 186,215 180,219" fill="#C6CAC9"/>
+
+<rect x="187" y="192" width="105" height="46" rx="3" fill="#FFFFFF" stroke="#E4E6E4"/>
+<text x="239" y="212" font-size="11.5" font-weight="600" fill="#E8730F" text-anchor="middle">ENCODE</text>
+<text x="239" y="228" font-size="9.5" fill="#7E8890" text-anchor="middle">H.264 / AAC</text>
+
+<polygon points="320,191 378,191 378,186 390,196 378,206 378,201 320,201" fill="#F1F1EE" stroke="#C6CAC9" stroke-width="1.2"/>
+
+<rect x="400" y="140" width="320" height="112" rx="3" fill="#F1F1EE" stroke="#DDDFDD"/>
+<text x="414" y="162" font-size="13.5" font-weight="600" letter-spacing="0.5" fill="#E8730F">MEDIA ENGINE</text>
+<text x="414" y="178" font-size="11" fill="#7E8890">SRS / OME · modular · pluggable</text>
+
+<rect x="414" y="192" width="92" height="46" rx="3" fill="#FFFFFF" stroke="#E4E6E4"/>
+<text x="460" y="219" font-size="11.5" font-weight="600" fill="#E8730F" text-anchor="middle">INGEST</text>
+<polygon points="507,211 513,215 507,219" fill="#C6CAC9"/>
+
+<rect x="514" y="192" width="92" height="46" rx="3" fill="#FFFFFF" stroke="#E4E6E4"/>
+<text x="560" y="219" font-size="11.5" font-weight="600" fill="#E8730F" text-anchor="middle">TRANSCODE</text>
+<polygon points="607,211 613,215 607,219" fill="#C6CAC9"/>
+
+<rect x="614" y="192" width="92" height="46" rx="3" fill="#FFFFFF" stroke="#E4E6E4"/>
+<text x="660" y="219" font-size="11.5" font-weight="600" fill="#E8730F" text-anchor="middle">PACKAGE</text>
+
+<polygon points="724,191 736,191 736,186 748,196 736,206 736,201 724,201" fill="#F1F1EE" stroke="#C6CAC9" stroke-width="1.2"/>
+
+<rect x="750" y="153" width="140" height="86" rx="3" fill="#FFFFFF" stroke="#E4E6E4"/>
+<text x="820" y="188" font-size="12.5" font-weight="600" letter-spacing="0.4" fill="#E8730F" text-anchor="middle">SWARM UPLOADER</text>
+<text x="820" y="206" font-size="11" fill="#7E8890" text-anchor="middle">our code</text>
+<text x="820" y="220" font-size="11" fill="#7E8890" text-anchor="middle">HLS to Swarm</text>
+
+<path d="M820,241 L820,264 Q820,272 812,272 L108,272 Q100,272 100,280 L100,296" fill="none" stroke="#C0C5C8" stroke-width="2" marker-end="url(#elb)"/>
+
+<text x="340" y="292" font-size="11.5" font-style="italic" fill="#9AA3AB" text-anchor="middle">Swarm network</text>
+<text x="795" y="292" font-size="11.5" font-style="italic" fill="#9AA3AB" text-anchor="middle">Viewer</text>
+
+<rect x="60" y="302" width="560" height="126" rx="4" fill="#FCF1E4" stroke="#EDCBA6"/>
+<g transform="translate(110,320) scale(0.08)" fill="#E8730F">
+<path d="M0 665.01V965l260 150 260-150.01V664.96L260 515 0 665.01zM855 515 595 665v299.99L855 1115l260-150.01V664.95L855 515zM817.32 300.27l-129.91-75.25-.13-149.98L557.5 0 297.68 150.01V450L557.5 600l259.82-150V300.27z"></path>
+<path d="m817.32 300.27 129.91-75.3V75L817.52 0 687.28 75.04l130.24 74.83-.2 150.4z"></path>
+</g>
+
+<text x="250" y="352" font-size="20" font-weight="700" letter-spacing="0.5" fill="#E8730F">SWARM</text>
+<text x="250" y="378" font-size="13" fill="#22313F">Origin · Storage · Delivery · Archive</text>
+<text x="250" y="398" font-size="11.5" font-style="italic" fill="#8B949C">replaces the origin server and the CDN</text>
+
+<polygon points="630,357 678,357 678,349 694,365 678,381 678,373 630,373" fill="#F1F1EE" stroke="#C6CAC9" stroke-width="1.2"/>
+
+<rect x="700" y="314" width="190" height="102" rx="3" fill="#FFFFFF" stroke="#E4E6E4"/>
+<rect x="776" y="326" width="38" height="24" rx="2" fill="#FFFFFF" stroke="#55606B" stroke-width="1.5"/>
+<rect x="768" y="350" width="54" height="4" rx="2" fill="#55606B"/>
+<text x="795" y="376" font-size="14" font-weight="600" letter-spacing="0.5" fill="#E8730F" text-anchor="middle">PLAYBACK</text>
+<text x="795" y="394" font-size="11" fill="#7E8890" text-anchor="middle">browser: custom hls.js</text>
+<text x="795" y="408" font-size="11" fill="#7E8890" text-anchor="middle">+ bee client</text>
+
+<text x="890" y="505" font-size="11" text-anchor="end">
+  <tspan font-weight="600" fill="#3A4652">SRT</tspan><tspan fill="#98A1A8"> - Secure Reliable Transport    </tspan><tspan font-weight="600" fill="#3A4652">RTMP</tspan><tspan fill="#98A1A8"> - Real-Time Messaging Protocol</tspan>
+</text>
+<text x="890" y="522" font-size="11" text-anchor="end">
+  <tspan font-weight="600" fill="#3A4652">HLS</tspan><tspan fill="#98A1A8"> - HTTP Live Streaming</tspan>
+</text>
+</svg>

@@ -1,0 +1,15 @@
+{
+  "name": "devcon8-arch-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Interactive explorer for the Devcon 8 streaming architecture",
+  "scripts": {
+    "test": "node --test",
+    "build": "node tools/bundle.js",
+    "dev": "node tools/serve.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

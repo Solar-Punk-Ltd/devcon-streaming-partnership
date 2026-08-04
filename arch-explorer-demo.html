@@ -1,0 +1,1677 @@
+<title>Devcon 8 architecture explorer</title>
+
+<style>
+  /* ── Tokens ─────────────────────────────────────────────────────────────
+     Light, spacious, product-grade, following the IcePanel direction.
+     Accent is Swarm amber, used for selection and the drill affordance.
+     Risk is a separate hue used only while an incident scenario is playing. */
+  :root {
+    --bg:        #F2F5F7;
+    --canvas:    #F7F9FA;
+    --panel:     #FFFFFF;
+    --panel-2:   #F4F7F8;
+    --line:      #DCE4E8;
+    --line-soft: #E9EEF1;
+
+    --ink:    #0E171D;
+    --ink-2:  #55676F;
+    --ink-3:  #8496A0;
+
+    --accent:    #D8841A;
+    --accent-lo: #D8841A16;
+    --risk:      #BC4A2C;
+    --risk-lo:   #BC4A2C14;
+    --link:      #0E6D80;
+
+    --grid: #E2E9ED;
+    --shadow: 0 1px 2px #0e171d0a, 0 6px 18px #0e171d0d;
+    --shadow-lg: 0 2px 6px #0e171d10, 0 18px 44px #0e171d14;
+
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --ease: cubic-bezier(.22,.61,.36,1);
+    --r: 7px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0D1418; --canvas:#10191E; --panel:#162127; --panel-2:#1C282F;
+      --line:#27353D; --line-soft:#1F2C33;
+      --ink:#E7EDF0; --ink-2:#93A5AF; --ink-3:#61757F;
+      --accent:#E9A33F; --accent-lo:#E9A33F1F;
+      --risk:#E0705A; --risk-lo:#E0705A1C;
+      --link:#4FAABE;
+      --grid:#1B262C;
+      --shadow:0 1px 2px #00000033,0 6px 18px #00000040;
+      --shadow-lg:0 2px 6px #0003,0 18px 44px #00000059;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#0D1418; --canvas:#10191E; --panel:#162127; --panel-2:#1C282F;
+    --line:#27353D; --line-soft:#1F2C33;
+    --ink:#E7EDF0; --ink-2:#93A5AF; --ink-3:#61757F;
+    --accent:#E9A33F; --accent-lo:#E9A33F1F;
+    --risk:#E0705A; --risk-lo:#E0705A1C;
+    --link:#4FAABE;
+    --grid:#1B262C;
+    --shadow:0 1px 2px #00000033,0 6px 18px #00000040;
+    --shadow-lg:0 2px 6px #0003,0 18px 44px #00000059;
+  }
+  :root[data-theme="light"] {
+    --bg:#F2F5F7; --canvas:#F7F9FA; --panel:#FFFFFF; --panel-2:#F4F7F8;
+    --line:#DCE4E8; --line-soft:#E9EEF1;
+    --ink:#0E171D; --ink-2:#55676F; --ink-3:#8496A0;
+    --accent:#D8841A; --accent-lo:#D8841A16;
+    --risk:#BC4A2C; --risk-lo:#BC4A2C14;
+    --link:#0E6D80;
+    --grid:#E2E9ED;
+    --shadow:0 1px 2px #0e171d0a,0 6px 18px #0e171d0d;
+    --shadow-lg:0 2px 6px #0e171d10,0 18px 44px #0e171d14;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  /* A track list holding minmax(0,1fr) is not reliably interpolable, so the
+     side columns snap rather than animate. Correctness over the slide. */
+  @property --detail-w { syntax: "<length>"; inherits: false; initial-value: 0px; }
+
+  #app {
+    position: relative;
+    display: grid;
+    /* Regions are placed explicitly. Auto-placement would shift stage and
+       detail a column left the moment the tree collapses. */
+    --tree-w: 0px;
+    grid-template-columns: var(--tree-w) minmax(0,1fr) var(--detail-w);
+    grid-template-rows: 52px minmax(0,1fr);
+    width: 100%;
+    height: 100svh;
+    min-height: 560px;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  #app.detail-open { --detail-w: 348px; }
+  #app.tree-open { --tree-w: 236px; }
+
+  /* ── Top bar ───────────────────────────────────────────────────────── */
+  #top {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    z-index: 40;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 9px;
+    padding-right: 12px;
+    border-right: 1px solid var(--line-soft);
+    flex: none;
+  }
+  .brand-mark {
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    border-radius: 5px;
+    background: var(--accent);
+    color: #fff;
+  }
+  .brand-name { font-size: 13px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; }
+
+  #crumbs { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; overflow: hidden; }
+  .crumb {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 9px; border: 0; border-radius: 5px;
+    background: transparent; font: inherit; font-size: 12.5px;
+    color: var(--ink-2); cursor: pointer; white-space: nowrap;
+  }
+  .crumb:hover { background: var(--panel-2); color: var(--ink); }
+  .crumb[aria-current="true"] { color: var(--ink); font-weight: 600; cursor: default; }
+  .crumb[aria-current="true"]:hover { background: transparent; }
+  .crumb-sep { color: var(--ink-3); font-size: 12px; flex: none; user-select: none; }
+  .crumb-lvl {
+    font-family: var(--mono); font-size: 9px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-3);
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 4px;
+  }
+
+  .tbtn {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 30px; padding: 0 11px;
+    border: 1px solid var(--line); border-radius: 6px;
+    background: var(--panel); font: inherit; font-size: 12.5px; font-weight: 500;
+    color: var(--ink-2); cursor: pointer; white-space: nowrap; flex: none;
+  }
+  .tbtn:hover { border-color: var(--ink-3); color: var(--ink); }
+  .tbtn.on { background: var(--accent-lo); border-color: var(--accent); color: var(--accent); }
+  .tbtn.icon { width: 30px; padding: 0; justify-content: center; }
+  .tbtn.icon svg { width: 15px; height: 15px; }
+  .tbtn:focus-visible, .crumb:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+
+  /* ── Scenario menu ─────────────────────────────────────────────────── */
+  #scenwrap { position: relative; flex: none; }
+  #scenmenu {
+    position: absolute; top: 36px; right: 0;
+    width: 340px; max-height: 70svh; overflow-y: auto;
+    background: var(--panel);
+    border: 1px solid var(--line); border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    padding: 7px;
+    display: none;
+    z-index: 60;
+  }
+  #scenmenu.open { display: block; }
+  .scen-k {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em;
+    text-transform: uppercase; color: var(--ink-3);
+    padding: 9px 8px 6px;
+  }
+  .scen {
+    display: block; width: 100%; text-align: left;
+    padding: 8px 9px; border: 0; border-radius: 6px;
+    background: transparent; font: inherit; color: var(--ink); cursor: pointer;
+  }
+  .scen:hover { background: var(--panel-2); }
+  .scen:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
+  .scen b { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 2px; }
+  .scen b::before {
+    content: ""; display: inline-block;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); margin-right: 7px; vertical-align: middle;
+  }
+  .scen[data-kind="incident"] b::before { background: var(--risk); }
+  .scen span { display: block; font-size: 11.5px; line-height: 1.4; color: var(--ink-2); padding-left: 13px; }
+
+  /* ── Model tree ────────────────────────────────────────────────────── */
+  #tree {
+    grid-column: 1; grid-row: 2;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    overflow: hidden auto; min-width: 0;
+    padding: 12px 8px 20px;
+    z-index: 30;
+  }
+  /* border-box clamps width to padding plus border, so a collapsed column
+     still leaves a sliver unless both are dropped too. */
+  #app:not(.tree-open) #tree { padding-left: 0; padding-right: 0; border-right-width: 0; }
+
+  .tree-k {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em;
+    text-transform: uppercase; color: var(--ink-3);
+    padding: 6px 8px 8px; white-space: nowrap;
+  }
+  .tw {
+    display: flex; align-items: center; gap: 7px;
+    width: 100%; padding: 5px 8px;
+    border: 0; border-radius: 5px; background: transparent;
+    font: inherit; font-size: 12.5px; color: var(--ink-2);
+    text-align: left; cursor: pointer; white-space: nowrap;
+  }
+  .tw:hover { background: var(--panel-2); color: var(--ink); }
+  .tw.on { background: var(--accent-lo); color: var(--ink); font-weight: 600; }
+  .tw:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
+  .tw.depth-1 { padding-left: 22px; }
+  .tw.depth-2 { padding-left: 38px; }
+  .tw .dot { width: 5px; height: 5px; border-radius: 50%; flex: none; background: var(--ink-3); opacity: .5; }
+  .tw.on .dot { background: var(--accent); opacity: 1; }
+  .tw .nm { overflow: hidden; text-overflow: ellipsis; }
+  .tw .cnt { margin-left: auto; flex: none; font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
+
+  /* ── Canvas ────────────────────────────────────────────────────────── */
+  #stage { grid-column: 2; grid-row: 2; position: relative; overflow: hidden; background: var(--canvas); }
+  #viewport { position: absolute; inset: 0; cursor: grab; touch-action: none; }
+  #viewport.dragging { cursor: grabbing; }
+  #grid {
+    position: absolute; inset: -150%;
+    background-image: radial-gradient(circle, var(--grid) 1px, transparent 1px);
+    pointer-events: none;
+  }
+  #world { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; transition: opacity .18s var(--ease); }
+  #world.swapping { opacity: 0; }
+
+  #edges { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+  .edge { fill: none; stroke: var(--line); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+  .edge.strong { stroke: var(--ink-3); }
+  .edge-hit { fill: none; stroke: transparent; stroke-width: 16; vector-effect: non-scaling-stroke; pointer-events: stroke; cursor: pointer; }
+  .edge-lbl {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em; fill: var(--ink-3);
+    paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round;
+  }
+  .edge-grp.hl .edge { stroke: var(--accent); stroke-width: 2.6; }
+  .edge-grp.hl .edge-lbl { fill: var(--accent); font-weight: 600; }
+  .edge-grp.dim { opacity: .18; }
+  #app.incident .edge-grp.hl .edge { stroke: var(--risk); }
+  #app.incident .edge-grp.hl .edge-lbl { fill: var(--risk); }
+
+  /* ── Objects ───────────────────────────────────────────────────────── */
+  .obj {
+    position: absolute;
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 11px 12px 12px;
+    border: 1.5px solid var(--line); border-radius: var(--r);
+    background: var(--panel); box-shadow: var(--shadow);
+    text-align: left; cursor: pointer;
+    transition: border-color .15s var(--ease), box-shadow .15s var(--ease),
+                transform .15s var(--ease), opacity .2s var(--ease);
+  }
+  .obj:hover { border-color: var(--ink-3); box-shadow: var(--shadow-lg); transform: translateY(-1px); }
+  .obj:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+  .obj.sel, .obj.hl { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-lo), var(--shadow-lg); }
+  #app.incident .obj.hl { border-color: var(--risk); box-shadow: 0 0 0 3px var(--risk-lo), var(--shadow-lg); }
+  .obj.dim { opacity: .28; }
+  .obj.external { background: var(--panel-2); border-style: dashed; box-shadow: none; }
+  .obj.actor { border-radius: 22px; }
+
+  .obj-top { display: flex; align-items: center; gap: 7px; }
+  .obj-ico { width: 15px; height: 15px; flex: none; color: var(--ink-3); }
+  .obj.sel .obj-ico, .obj.hl .obj-ico { color: var(--accent); }
+  #app.incident .obj.hl .obj-ico { color: var(--risk); }
+  .obj-name {
+    font-size: 13.5px; font-weight: 620; letter-spacing: -.012em; line-height: 1.2;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .obj-type { font-family: var(--mono); font-size: 9px; letter-spacing: .11em; text-transform: uppercase; color: var(--ink-3); }
+  .obj-desc { font-size: 11.5px; line-height: 1.42; color: var(--ink-2); }
+  .obj-foot { display: flex; align-items: center; gap: 5px; margin-top: auto; flex-wrap: wrap; }
+  .tech {
+    font-family: var(--mono); font-size: 9.5px;
+    padding: 2px 5px; border-radius: 3px;
+    background: var(--panel-2); border: 1px solid var(--line-soft);
+    color: var(--ink-2); white-space: nowrap;
+  }
+  .obj.external .tech { background: var(--panel); }
+
+  /* Blast-radius marker. Only on things whose failure is contained. */
+  .blast {
+    font-family: var(--mono); font-size: 9px; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--ink-3);
+    border: 1px dashed var(--line); border-radius: 3px; padding: 2px 5px;
+  }
+
+  .drill {
+    position: absolute; top: -10px; right: -10px;
+    display: inline-flex; align-items: center; gap: 3px;
+    height: 22px; padding: 0 7px;
+    border: 1.5px solid var(--line); border-radius: 11px;
+    background: var(--panel); box-shadow: var(--shadow);
+    color: var(--ink-2); font-family: var(--mono); font-size: 10px; font-weight: 600;
+    cursor: pointer; opacity: 0;
+    transition: opacity .15s var(--ease), border-color .15s var(--ease),
+                color .15s var(--ease), background-color .15s var(--ease);
+  }
+  .obj:hover .drill, .obj:focus-within .drill, .drill:focus-visible { opacity: 1; }
+  .drill:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .drill:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+  .drill svg { width: 11px; height: 11px; }
+
+  /* ── Canvas chrome ─────────────────────────────────────────────────── */
+  .float {
+    position: absolute; z-index: 20;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 6px; box-shadow: var(--shadow);
+  }
+  #zoomer { right: 12px; bottom: 12px; display: flex; overflow: hidden; }
+  #zoomer button {
+    width: 32px; height: 30px; border: 0; border-right: 1px solid var(--line-soft);
+    background: transparent; color: var(--ink-2);
+    font-family: var(--mono); font-size: 13px; cursor: pointer;
+  }
+  #zoomer button:last-child { border-right: 0; width: auto; padding: 0 10px; font-size: 11px; }
+  #zoomer button:hover { background: var(--panel-2); color: var(--ink); }
+  #zoomer button:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
+
+
+  /* Scenario player */
+  #flowbar {
+    left: 12px; right: 12px; bottom: 12px;
+    display: none; align-items: flex-start; gap: 12px;
+    padding: 10px 12px;
+    z-index: 25;
+  }
+  #flowbar.on { display: flex; }
+  #app.incident #flowbar { border-color: var(--risk); }
+  #flowctl { display: flex; gap: 5px; flex: none; }
+  .fbtn {
+    width: 27px; height: 27px; flex: none;
+    border: 1px solid var(--line); border-radius: 5px;
+    background: var(--panel); color: var(--ink-2);
+    cursor: pointer; display: grid; place-items: center;
+  }
+  .fbtn:hover { border-color: var(--ink-3); color: var(--ink); }
+  .fbtn:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+  .fbtn svg { width: 12px; height: 12px; }
+  #flowtxt { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+  #flowhead {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  #flowname { color: var(--accent); font-weight: 600; }
+  #app.incident #flowname { color: var(--risk); }
+  #flowstep { font-size: 12.5px; line-height: 1.45; color: var(--ink); }
+  #flowstep.runbook { border-left: 2px solid var(--risk); padding-left: 9px; }
+  #flowdots { display: flex; gap: 3px; margin-left: auto; flex: none; padding-top: 2px; }
+  #flowdots i {
+    display: block; width: 14px; height: 3px; border-radius: 2px;
+    background: var(--line); cursor: pointer;
+  }
+  #flowdots i.done { background: var(--ink-3); }
+  #flowdots i.now { background: var(--accent); }
+  #app.incident #flowdots i.now { background: var(--risk); }
+
+  /* ── Detail panel ──────────────────────────────────────────────────── */
+  #detail {
+    grid-column: 3; grid-row: 2;
+    background: var(--panel); border-left: 1px solid var(--line);
+    overflow: hidden; display: flex; flex-direction: column; min-width: 0;
+  }
+  #app:not(.detail-open) #detail { border-left: 0; }
+  .d-head {
+    padding: 15px 16px 13px; border-bottom: 1px solid var(--line-soft);
+    display: flex; flex-direction: column; gap: 9px; position: relative;
+  }
+  .d-type { font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3); }
+  .d-name {
+    margin: 0; font-size: 19px; font-weight: 660; letter-spacing: -.022em;
+    line-height: 1.15; text-wrap: balance; padding-right: 26px;
+  }
+  .d-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  #d-close {
+    position: absolute; top: 12px; right: 12px; width: 24px; height: 24px;
+    border: 0; border-radius: 5px; background: transparent;
+    color: var(--ink-3); font-size: 14px; line-height: 1; cursor: pointer;
+  }
+  #d-close:hover { background: var(--panel-2); color: var(--ink); }
+  #d-close:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+
+  .d-body { padding: 15px 16px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+  .d-body p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ink-2); }
+  .d-k { font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 9px; }
+  .kv { display: grid; grid-template-columns: 1fr auto; gap: 7px 12px; font-size: 12px; }
+  .kv dt { color: var(--ink-2); }
+  .kv dd { margin: 0; font-family: var(--mono); font-size: 11.5px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .kv dd.open { color: var(--ink-3); font-weight: 400; }
+
+  .conn { display: flex; align-items: baseline; gap: 7px; padding: 6px 0; border-top: 1px solid var(--line-soft); font-size: 12px; }
+  .conn:first-of-type { border-top: 0; }
+  .conn .ar { font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex: none; }
+  .conn .to { font-weight: 560; }
+  .conn .via { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); margin-left: auto; }
+  .conn button { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+  .conn button:hover .to { color: var(--accent); }
+  .conn button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 3px; }
+
+  .note { font-size: 12.5px; line-height: 1.55; color: var(--ink-2); border-left: 2px solid var(--accent); padding-left: 11px; }
+
+  .d-drill, .d-scen {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 9px 12px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--panel-2); font: inherit; font-size: 12.5px; font-weight: 560;
+    color: var(--ink); cursor: pointer; text-align: left;
+  }
+  .d-drill:hover { border-color: var(--accent); background: var(--accent-lo); }
+  .d-scen { margin-bottom: 6px; font-weight: 500; }
+  .d-scen:hover { border-color: var(--accent); background: var(--accent-lo); }
+  .d-scen[data-kind="incident"]:hover { border-color: var(--risk); background: var(--risk-lo); }
+  .d-drill:focus-visible, .d-scen:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+  .d-drill svg { width: 13px; height: 13px; color: var(--accent); flex: none; }
+  .d-scen i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
+  .d-scen[data-kind="incident"] i { background: var(--risk); }
+
+  /* ── First-run hint ────────────────────────────────────────────────── */
+  #hint {
+    position: absolute; z-index: 22; top: 12px; left: 12px;
+    padding: 9px 12px; max-width: 300px;
+    font-size: 12px; line-height: 1.5; color: var(--ink-2);
+  }
+  #hint b { color: var(--ink); font-weight: 600; }
+  #hint button {
+    margin-top: 7px; border: 0; background: transparent; padding: 0;
+    font: inherit; font-size: 11.5px; color: var(--link); cursor: pointer; text-decoration: underline;
+  }
+  #hint.gone { display: none; }
+
+  @media (max-width: 1000px) {
+    #app.detail-open { --detail-w: min(330px, 82vw); }
+    #app.tree-open { --tree-w: 0px; }
+    #app.tree-open #tree {
+      position: absolute; left: 0; top: 52px; bottom: 0;
+      width: min(250px, 80vw); box-shadow: var(--shadow-lg); z-index: 50;
+    }
+    #hint { display: none; }
+    .brand-name { display: none; }
+    #flowdots { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+
+<div id="app">
+  <header id="top">
+    <button type="button" class="tbtn icon" id="treebtn" aria-label="Show or hide the model tree" aria-expanded="true" title="Model tree (T)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+        <rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M6.5 3v10"/>
+      </svg>
+    </button>
+
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M8 1.6 14 5v6L8 14.4 2 11V5z"/><path d="M8 1.6V8l6 3M8 8 2 11"/>
+        </svg>
+      </span>
+      <span class="brand-name">Devcon 8 architecture</span>
+    </div>
+
+    <nav id="crumbs" aria-label="Hierarchy"></nav>
+
+    <div id="scenwrap">
+      <button type="button" class="tbtn" id="scenbtn" aria-haspopup="true" aria-expanded="false" title="Scenarios (S)">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M3 8h10M9 4l4 4-4 4"/>
+        </svg>
+        Scenarios
+      </button>
+      <div id="scenmenu" role="menu" aria-label="Scenarios"></div>
+    </div>
+  </header>
+
+  <nav id="tree" aria-label="Model"></nav>
+
+  <div id="stage">
+    <div id="viewport">
+      <div id="grid"></div>
+      <div id="world"><svg id="edges" aria-hidden="true"></svg></div>
+    </div>
+
+    <div class="float" id="hint">
+      <b>Start here.</b> Hover any box for a magnifier showing how many parts are inside, and click it to go a level deeper.
+      Open <b>Scenarios</b> to watch a segment cross the whole system, or to walk an incident end to end.
+      <button type="button" id="hintclose">Got it</button>
+    </div>
+
+
+    <div class="float" id="zoomer">
+      <button type="button" id="zout" aria-label="Zoom out">&minus;</button>
+      <button type="button" id="zin" aria-label="Zoom in">+</button>
+      <button type="button" id="zfit">Fit</button>
+    </div>
+
+    <div class="float" id="flowbar">
+      <div id="flowctl">
+        <button type="button" class="fbtn" id="fprev" aria-label="Previous step">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 3 5 8l5 5"/></svg>
+        </button>
+        <button type="button" class="fbtn" id="fplay" aria-label="Play or pause">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 3v10l9-5z"/></svg>
+        </button>
+        <button type="button" class="fbtn" id="fnext" aria-label="Next step">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3l5 5-5 5"/></svg>
+        </button>
+      </div>
+      <div id="flowtxt">
+        <div id="flowhead"><span id="flowname"></span><span id="flowcount"></span></div>
+        <div id="flowstep"></div>
+      </div>
+      <div id="flowdots"></div>
+      <button type="button" class="fbtn" id="fstop" aria-label="Exit scenario">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <aside id="detail" aria-label="Object detail" aria-hidden="true">
+    <div class="d-head">
+      <span class="d-type" id="d-type"></span>
+      <h2 class="d-name" id="d-name"></h2>
+      <div class="d-row" id="d-row"></div>
+      <button type="button" id="d-close" aria-label="Close">&#10005;</button>
+    </div>
+    <div class="d-body" id="d-body"></div>
+  </aside>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ══ Model ═════════════════════════════════════════════════════════════
+     Objects and diagrams are separate, the way C4 tools model it: an object
+     exists once and appears in whatever diagrams reference it.
+
+     Sizing throughout assumes what EF gave us: 10 stages always on and up to
+     20, 08:00 to 20:00 daily, roughly 4k peak concurrent, and 70% mobile.  */
+
+  const ICON = {
+    person: '<path d="M8 7.5a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z"/><path d="M3 14a5 5 0 0 1 10 0"/>',
+    system: '<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12"/>',
+    net:    '<path d="M8 1.8 13.5 5v6L8 14.2 2.5 11V5z"/><path d="M8 1.8V8l5.5 3M8 8 2.5 11"/>',
+    app:    '<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M5.5 6.5h5M5.5 9.5h3"/>',
+    store:  '<ellipse cx="8" cy="4" rx="5.5" ry="2"/><path d="M2.5 4v8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V4"/>',
+    stream: '<path d="M2 8h3l2-4 2 8 2-4h3"/>',
+    shield: '<path d="M8 2 13 4v4.5c0 3-2.2 4.8-5 5.5-2.8-.7-5-2.5-5-5.5V4z"/>',
+    eye:    '<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/>'
+  };
+
+  const O = {
+    /* ── Context ── */
+    av: { name: "Devcon AV", type: "External actor", icon: "person", external: true,
+      tech: ["SRT", "10 to 20 stages"],
+      desc: "Produces one program feed per stage on its own network.",
+      blurb: "EF's AV vendor owns capture, vision mix, audio and encoding, on a production network kept separate from the public tier. They have said the video format is adaptable and they will work to whatever specification we give them, so the contribution spec is ours to write.",
+      metrics: [["Stages, steady", "10", ""], ["Stages, peak", "20", ""], ["Hours per day", "08:00 to 20:00", ""], ["Contribution", "8 Mbps", ""]],
+      note: "The spec to hand them: 1080p30 H.264 High at 8 Mbps CBR, closed GOP, fixed 2 second keyframe interval, no scene-cut keyframes, AAC 128 kbps, and two simultaneous SRT outputs to two different hosts. The keyframe interval is the one people forget, and it is what makes clean segmenting possible." },
+
+    sys: { name: "Solar Punk streaming", type: "Software system", icon: "system", drill: "containers",
+      tech: ["swarm-hls-stream"],
+      desc: "Ingest, transcode, publish to Swarm, deliver, archive.",
+      blurb: "Everything from the encoder output onwards. Receives a produced feed per stage, transcodes a four rung ladder, writes every segment to Swarm in real time, serves viewers through a CDN-fronted gateway tier, and leaves the segments behind as the permanent archive.",
+      metrics: [["Peak concurrent", "4,000", ""], ["Mobile share", "70%", ""], ["Avg delivered", "1.8 Mbps", ""], ["Event egress", "~70 TB", ""]],
+      note: "EF asked for stability above everything else. That is why blast radius is contained to one stage, why spare capacity stands ready rather than being hot-paired, and why the mirror runs from day one." },
+
+    swarm: { name: "Swarm network", type: "External system", icon: "net", external: true,
+      tech: ["Bee 2.8", "Gnosis"],
+      desc: "Origin, storage, delivery and archive in one.",
+      blurb: "3,143 reachable nodes at the last snapshot. The usable storage radius is 8, giving 256 neighborhoods with a minimum of 8 nodes each, so 256 is the real number whenever we talk about covering the address space. Effectively no presence in India, so every Mumbai retrieval crosses to Europe and back.",
+      metrics: [["Reachable nodes", "3,143", ""], ["Neighborhoods at depth 8", "256", ""], ["Nodes in India", "about zero", ""]],
+      note: "A segment's 183 chunks hash into 183 different neighborhoods. Blocking one blocks roughly 1 chunk in 256, and erasure coding reconstructs it. Censoring the stream means capturing a large fraction of the whole network, not a corner of it." },
+
+    yt: { name: "YouTube Live", type: "External system", icon: "stream", external: true,
+      tech: ["RTMP"],
+      desc: "The independent path. Always hot, never the default.",
+      blurb: "A second encoder output running from day one, never gated on a failure. This is the only component that survives total failure of our own stack, which is exactly why it exists.",
+      metrics: [["Channels needed", "2 to 3", ""], ["Egress cost", "$0", ""], ["Concurrency", "unlimited", ""]],
+      note: "A CDN is not a fallback. It serves our content from our origin, so if our publish path breaks the CDN has nothing to serve. YouTube is a genuinely separate path. The two do different jobs and we want both." },
+
+    viewers: { name: "Viewers", type: "External actor", icon: "person", external: true,
+      tech: ["70% mobile"],
+      desc: "Global, India-weighted, mostly on phones.",
+      blurb: "EF expects a peak around 4,000 concurrent based on previous years, possibly higher. Seventy percent are on mobile, which settles two arguments at once: the lower ABR rungs carry most of the audience, and the in-browser node tier can only ever be a desktop footnote.",
+      metrics: [["Peak concurrent", "4,000", ""], ["Stress ceiling", "10,000", ""], ["Mobile", "70%", ""], ["Avg bitrate", "1.8 Mbps", ""]],
+      note: "iOS Safari uses native HLS, which fetches URLs itself and bypasses any JavaScript loader. iPhone viewers can therefore never run an in-browser Swarm node, no matter how good the client gets." },
+
+    /* ── Containers ── */
+    ingest: { name: "Ingest edge", type: "Container", icon: "shield",
+      tech: ["SRT", "UDP", "2 zones"],
+      desc: "Terminates SRT, authenticates, routes to the right stage.",
+      blurb: "A thin shared edge in two availability zones. Each encoder pushes twice, once into each zone, so the first line of redundancy costs nothing extra. It checks the streamid and passphrase, then hands the feed to that stage's own worker.",
+      metrics: [["Zones", "2", ""], ["Transport", "SRT over UDP", ""], ["Auth", "streamid + passphrase", ""], ["Blast radius", "all stages", ""]],
+      note: "SRT is UDP, so this needs an L4 load balancer. Most managed HTTP load balancers cannot carry it. This is the one genuinely shared component in the publish path, so it is the piece to make boring and highly available." },
+
+    pipeline: { name: "Stage pipeline", type: "Container", icon: "app", drill: "stage",
+      tech: ["ffmpeg", "containers"], blast: "1 stage",
+      desc: "One isolated worker per stage. Transcode, package, publish.",
+      blurb: "Every stage gets its own worker, so a crash takes down exactly one stage. At 20 stages a four rung ladder is roughly 150 vCPU across about 10 machines, and we run N+2 spares rather than pairing every worker with a hot twin.",
+      metrics: [["Workers at 20 stages", "20", ""], ["vCPU per stage", "about 7", ""], ["Total vCPU", "about 150", ""], ["Spare capacity", "N+2", ""], ["Blast radius", "1 stage", ""]],
+      note: "Standing spares beat one-to-one hot standby here. Dual SRT already covers the instant failure case with no state to move, so paying twice for compute would protect against a failure mode you have already handled." },
+
+    fleet: { name: "Warm Swarm fleet", type: "Container", icon: "net",
+      tech: ["Bee", "wss://"],
+      desc: "Neighborhood coverage, cache warming, browser entry.",
+      blurb: "Nodes we run inside Swarm to hold a near copy of our own content and to warm retrieval paths before viewers ask for them. Since Bee 2.7 browsers can only dial nodes speaking wss://, and that is opt-in, so this fleet is also what makes in-browser nodes possible at all.",
+      metrics: [["Start at", "32 nodes", ""], ["Full coverage", "256 nodes", ""], ["Host", "cheap bandwidth", ""], ["WSS-reachable mainnet", "unmeasured", "open"]],
+      note: "Do not run this on expensive cloud egress. A Swarm node serves the whole network and earns BZZ far below retail per-GB pricing, so it belongs where bandwidth is close to free, with a few India-local nodes for the WSS entry role." },
+
+    delivery: { name: "Delivery tier", type: "Container", icon: "system", drill: "deliv",
+      tech: ["CDN", "Bee"],
+      desc: "CDN in front of three origin gateways. Carries everyone.",
+      blurb: "One pool serving all stages rather than per-stage pools, because segments are content-addressed and a shared cache gets a far better hit rate. The CDN handles about 7.2 Gbps at peak. Behind it the origin serves only the unique content, roughly 4 TB across the whole event.",
+      metrics: [["Peak edge", "7.2 Gbps", ""], ["Origin VMs", "3", ""], ["Unique content", "about 4 TB", ""], ["Event egress", "about 70 TB", ""], ["Egress cost", "about $350", ""]],
+      note: "Restrict what the gateway serves, never who watches. Swarm content is public by address, so anyone holding the reference can fetch it anywhere. Do not write access control in a document EF reads." },
+
+    mirror: { name: "Web2 mirror", type: "Container", icon: "stream",
+      tech: ["RTMP"],
+      desc: "A second encoder output, hot from day one.",
+      blurb: "Not a break-glass procedure. A second output that is always running, so failover is a switch rather than a cold start. Cold failover during a keynote turns a ten second glitch into a four minute outage.",
+      metrics: [["State", "always on", ""], ["Failover", "player-side", ""], ["Extra encode", "1 rung per stage", ""]],
+      note: "This is what makes a yes defensible. If the Swarm path is not ready by late October, the fallback is not cancelling, it is running the mirror as primary with Swarm as a clearly labelled beta." },
+
+    player: { name: "Player", type: "Container", icon: "app", drill: "play",
+      tech: ["hls.js", "bee-js"],
+      desc: "Swarm loader, ABR, tier selection, telemetry.",
+      blurb: "Built on hls.js because its loader is pluggable, which is what lets us fetch segments from Swarm instead of from HTTP. Reads a signed config feed for tier policy, gateway list, caps and kill switch, then watches its own experience and drops a rung on an SLO breach.",
+      metrics: [["Rebuffer SLO", "under 0.5%", ""], ["TTFF target", "under 3 s", ""], ["Latency", "10 to 15 s", ""], ["Multi-stage UX", "to build", "open"]],
+      note: "The multi-stage viewer experience is unbuilt work and it is not small. Twenty parallel stages with a schedule, now-playing metadata and a switcher is a real frontend project, and it is the part the audience actually touches." },
+
+    ctrl: { name: "Control plane", type: "Container", icon: "eye", drill: "control",
+      tech: ["Prometheus", "Grafana"],
+      desc: "Know what is happening, and be able to act on it.",
+      blurb: "EF asked for stability, which in practice means detection and response rather than more redundancy. Configure the generic parts, Prometheus, Grafana, Loki, Alertmanager and Terraform, then build only what does not exist: the Swarm exporters, the stream prober, the stamp manager and the run-of-show board.",
+      metrics: [["Configure", "6 services", ""], ["Build", "4 components", ""], ["Alert channels", "page + chat", ""]],
+      note: "Grafana already has accounts, teams, permissions and audit logs. Building a bespoke console would be a three to six month product competing for the same engineers who need to ship ABR over Swarm and the player." },
+
+    netmon: { name: "Network monitor", type: "Container", icon: "net",
+      tech: ["SwarmScan", "bzz-radar"],
+      desc: "Watches Swarm itself, separately from watching us.",
+      blurb: "Continuous observation of network size, neighborhood population, reachable node count and anomalies. Deliberately a separate concern from our own health, because it answers a different question: is the ground moving under us.",
+      metrics: [["Scope", "whole network", ""], ["Cadence", "15 min", ""], ["Design", "out of scope here", "open"]],
+      note: "Partly exists already. SwarmScan publishes a neighborhoods API, and bzz-radar and swarm-staking-stats cover parts of this." },
+
+    /* ── Stage pipeline components ── */
+    srtin: { name: "SRT receiver", type: "Component", icon: "shield",
+      tech: ["srt", "AES"],
+      desc: "One endpoint per stage, unguessable and authenticated.",
+      blurb: "Each stage has its own random streamid and passphrase, never stage-1 or stage-2. An unknown id is refused outright. Combined with an IP allowlist to the venue's egress, a misconfigured encoder physically cannot land on another stage's endpoint.",
+      metrics: [["Auth", "streamid + passphrase", ""], ["Allowlist", "venue egress IPs", ""], ["Latency buffer", "300 ms", ""]],
+      note: "This answers the cross-stream worry directly. Stage 3's encoder cannot reach stage 7, because the id and passphrase will not match and the receiver rejects rather than guesses." },
+
+    worker: { name: "Transcode worker", type: "Component", icon: "app",
+      tech: ["ffmpeg", "x264"], blast: "1 stage",
+      desc: "One container per stage. Four rungs out of one feed.",
+      blurb: "Decodes the 8 Mbps contribution feed and encodes 360p, 480p, 720p and 1080p. Stateless, so it can be killed and restarted freely, which is exactly what makes per-stage isolation affordable.",
+      metrics: [["Rungs", "4", ""], ["360p / 480p", "0.8 / 1.2 Mbps", ""], ["720p / 1080p", "2.5 / 4.5 Mbps", ""], ["vCPU", "about 7", ""], ["Blast radius", "1 stage", ""]],
+      note: "With 70% of viewers on mobile, the 360p and 480p rungs carry most of the audience. The ladder is not a luxury tier, it is the product for the majority." },
+
+    packager: { name: "HLS packager", type: "Component", icon: "app",
+      tech: ["HLS", "2 s"],
+      desc: "Segments and playlists, aligned to the keyframes.",
+      blurb: "Two second segments cut exactly on the encoder's keyframes, which is why the fixed closed GOP in the contribution spec matters so much. Writes a master playlist plus one variant playlist per rung.",
+      metrics: [["Segment", "2 s", ""], ["Variants", "4", ""], ["Window", "live edge", ""]],
+      note: "HLS rather than DASH because client support is universal and its segment plus playlist model maps cleanly onto content addressing. Low-latency HLS is deliberately out of scope for a first run, since its partial segments would multiply chunk count and feed update rate." },
+
+    uploader: { name: "Stream uploader", type: "Component", icon: "app",
+      tech: ["swarm-hls-stream"],
+      desc: "Chunks, stamps and uploads. Resumes after a crash.",
+      blurb: "Queued real-time upload with a segment buffer and concurrent uploads. Survives a hard kill and resumes from saved state rather than wrongly finalising the stream to VOD, which is proven by fault injection against a real stack.",
+      metrics: [["Buffer", "100 segments", ""], ["Concurrency", "10 uploads", ""], ["Crash recovery", "fault-injected", ""]],
+      note: "This is the process that must never run twice against one feed. Two uploaders signing the same feed fork its index, and that is permanent archive corruption rather than a temporary outage." },
+
+    beepub: { name: "Bee publisher", type: "Component", icon: "net",
+      tech: ["Bee 2.8.1"],
+      desc: "Pushsync to neighborhoods, signs the feed.",
+      blurb: "Pushes chunks to the neighborhoods that own their addresses and updates the signed feed pointing at the current manifest. Holds the postage batch and the chequebook, which makes it the one stateful, funded component in the pipeline.",
+      metrics: [["Stamp type", "mutable", ""], ["Chequebook floor", "0.5 BZZ", ""], ["Key storage", "vault, not the VM", ""]],
+      note: "Whoever holds the signing key controls the stream. Per-stage keys, kept in a vault and never on the VM, rotated after the event." },
+
+    lease: { name: "Publish lease", type: "Component", icon: "store",
+      tech: ["short TTL"],
+      desc: "Exactly one writer per feed, arbitrated centrally.",
+      blurb: "A short TTL record the control plane hands out. Only the holder signs feed updates. Lose the lease and signing stops immediately, before any replacement can start.",
+      metrics: [["Writers allowed", "1", ""], ["TTL", "seconds", ""], ["Failover gap", "2 to 4 s", ""]],
+      note: "The safety property is not that failover is fast, it is that two writers can never overlap. A gap is recoverable. A forked feed is not." },
+
+    record: { name: "Local recording", type: "Component", icon: "store",
+      tech: ["on-site"],
+      desc: "A clean copy, whatever the live path did.",
+      blurb: "One recording per stage, independent of the network path. If contribution drops for ninety seconds the live stream has a gap and nothing changes that, but the permanent archive does not have to inherit it.",
+      metrics: [["Per stage", "1", ""], ["Use", "splice post-event", ""]],
+      note: "Cheap insurance entirely under our control. It turns a contribution failure into a live incident rather than a permanent hole in Devcon's archive." },
+
+    /* ── Delivery components ── */
+    beegw: { name: "Origin gateway", type: "Component", icon: "system",
+      tech: ["nginx", "Bee"],
+      desc: "Three VMs. Fetches from Swarm once, caches forever.",
+      blurb: "Three rather than two, so losing one does not halve capacity. Each runs an HTTP cache in front of a Bee node. Behind the CDN shield these serve only unique content, about 180 Mbps on average, so they are sized for resilience rather than throughput.",
+      metrics: [["VMs", "3", ""], ["Avg origin load", "about 180 Mbps", ""], ["Balancing", "least-connections", ""], ["Health check", "real segment fetch", ""]],
+      note: "Health check on an actual segment retrieval, not a TCP handshake. A Bee node can be listening happily and still be unable to retrieve anything." },
+
+    allow: { name: "Reference allowlist", type: "Component", icon: "shield",
+      tech: ["per event"],
+      desc: "The gateway serves our feeds and nothing else.",
+      blurb: "An allowlist of our feed owners and manifest references. Everything else is refused. This stops the gateway being used as a free open proxy for arbitrary Swarm content, which is a genuine cost and abuse problem.",
+      metrics: [["Scope", "our feeds only", ""], ["Write API", "never exposed", ""]],
+      note: "This is the achievable half of what people mean by gateway security. The other half, restricting who may watch, is not possible for public content and should not be implied." },
+
+    shield: { name: "Origin shield", type: "Component", icon: "store",
+      tech: ["tiered cache"],
+      desc: "The setting the whole cost model rests on.",
+      blurb: "With tiered caching the origin serves each unique object roughly once. Without it every point of presence pulls every object independently and origin traffic jumps by an order of magnitude.",
+      metrics: [["Origin pulls", "about 1 per object", ""], ["Without shield", "1 per PoP", ""], ["Verify", "during load test", "open"]],
+      note: "Verify the shield is actually on and measure origin pull volume during load testing, before anyone quotes a saving that depends on it." },
+
+    cdn: { name: "CDN edge", type: "Component", icon: "net",
+      tech: ["volume tier"],
+      desc: "Absorbs the viewers, and absorbs the attacks.",
+      blurb: "Content-addressed segments are immutably cacheable, so the edge gets a near-perfect hit rate and viewer egress becomes cheap. It also doubles as the DDoS absorption layer, which is a service you would otherwise have to build yourself.",
+      metrics: [["Peak", "7.2 Gbps", ""], ["Event egress", "about 70 TB", ""], ["Segment TTL", "effectively infinite", ""], ["Manifest TTL", "1 to 2 s", ""]],
+      note: "This is a cache, not an origin. Swarm remains origin, storage and archive, and any viewer who distrusts the cache can fetch identical hash-verified bytes from the network directly. No web2 CDN can offer that." },
+
+    browsernode: { name: "In-browser node", type: "Component", icon: "app",
+      tech: ["weeb-3", "WASM"],
+      desc: "Desktop opt-in only. Capped and instrumented.",
+      blurb: "Twenty concurrent viewers, each a real Bee node, watched a live Swarm stream at 2.59% stalled with a 433 ms median retrieval. It works. But each costs 0.850 vCPU, iOS cannot run it at all, and 70% of this audience is on a phone.",
+      metrics: [["Stalled", "2.59%", ""], ["Retrieval p50", "433 ms", ""], ["Cost per viewer", "0.850 vCPU", ""], ["Realistic share", "low single digit %", ""]],
+      note: "Ship it as a capped experiment behind a signed config flag with a kill switch that reaches every viewer in under 30 seconds. Ramp 1%, then 5%, then 10%, watching the network between steps." },
+
+    /* ── Control plane components ── */
+    probes: { name: "Synthetic probes", type: "Component", icon: "eye",
+      tech: ["4 regions"],
+      desc: "Measures what a viewer sees, not what servers think.",
+      blurb: "Pull the manifest exactly as a viewer would and assert it is advancing and gapless. Run from Mumbai, Europe, the US and south-east Asia. The most diagnostic probe deliberately fetches uncached content, because if every probe hits cache then everything looks healthy right up until it is not.",
+      metrics: [["Manifest liveness", "10 s", ""], ["Segment fetch", "30 s", ""], ["Cold-cache probe", "5 min", ""], ["Regions", "4", ""]],
+      note: "This is the highest-value thing in the control plane, because it is the only check that fails when the viewer experience fails rather than when a server does." },
+
+    metrics: { name: "Metrics", type: "Component", icon: "eye",
+      tech: ["Prometheus"],
+      desc: "Scrapes every node, stage, gateway and probe.",
+      blurb: "A pull model with one exporter per node keeps collection cheap at this scale. The generic exporters are off the shelf. The one we build is Swarm-specific: chequebook balance, stamp TTL, batch utilisation, pushsync lag, neighborhood population and WSS reachability.",
+      metrics: [["Model", "pull", ""], ["Scrape", "15 s", ""], ["Custom exporter", "Swarm", ""]],
+      note: "The Swarm exporter is the only genuinely new monitoring code in the whole plan. Everything else is configuration." },
+
+    logs: { name: "Logs", type: "Component", icon: "store",
+      tech: ["Loki"],
+      desc: "Searchable, labelled by stage, for the post-mortem.",
+      blurb: "Labelled by stage and component so an incident on one stage can be read without wading through nineteen others. Retention covers the event plus the write-up period.",
+      metrics: [["Labelled by", "stage, component", ""], ["Retention", "event + 30 d", ""]] },
+
+    alerts: { name: "Alerting", type: "Component", icon: "shield",
+      tech: ["Alertmanager"],
+      desc: "Pages a human when something needs a human.",
+      blurb: "Routes by severity. A stage losing its feed pages the on-call. A chequebook nearing its floor tops itself up and only pages if that fails. Alert fatigue over a four day event is a real failure mode, so anything that can self-heal should.",
+      metrics: [["Channels", "page + chat", ""], ["On-call", "UTC+5:30 aware", ""], ["Escalation", "tiered", ""]],
+      note: "Mumbai is UTC+5:30 and the event runs twelve hours a day for four days. The rota is a real design item and it is still untouched." },
+
+    stamps: { name: "Stamp manager", type: "Component", icon: "store",
+      tech: ["postage-batcher"],
+      desc: "Buy, top up, dilute, and warn before it hurts.",
+      blurb: "Postage is the thing that quietly kills a Swarm stream. This owns the whole lifecycle: buy mutable batches, watch TTL and bucket utilisation per batch, dilute before saturation, and top up in bulk atomically.",
+      metrics: [["Batch type", "mutable", ""], ["Dilute at", "85% utilisation", ""], ["TTL warning", "14 days", ""], ["TTL critical", "7 days", ""]],
+      note: "Measured, and it is the reason this component exists: an immutable batch filled 6.5 stream-hours in rather than the 2.3 predicted, and because only the fullest buckets refuse, it kept publishing with holes while every log line said success." },
+
+    cheq: { name: "Chequebook watcher", type: "Component", icon: "store",
+      tech: ["on-chain"],
+      desc: "Keeps every node funded, or pages someone.",
+      blurb: "An underfunded chequebook throttles retrieval past the free allowance and degrades delivery quietly. Our own benchmarking found chequebook funding, not segment size, is the single biggest lever on retrieval health.",
+      metrics: [["Floor", "0.5 BZZ", ""], ["Action", "auto top-up", ""], ["On failure", "page", ""]],
+      note: "Promote this from a preflight test gate to a continuously enforced production invariant. It is the difference between a healthy stream and one that degrades for reasons nobody can see." },
+
+    runofshow: { name: "Run-of-show board", type: "Component", icon: "app",
+      tech: ["Grafana"],
+      desc: "One row per stage. The thing on the wall.",
+      blurb: "Twenty rows: stage, scheduled session, feed state, tier, viewers, rebuffer, last segment age. Designed so an operator can see which stage is unhappy without reading a single graph.",
+      metrics: [["Rows", "1 per stage", ""], ["Refresh", "10 s", ""], ["Key signal", "last segment age", ""]],
+      note: "Last segment age is the most useful number on the board. If it stops climbing the stage is fine, and if it grows past a few segment durations something is wrong regardless of what every other metric says." },
+
+    deploy: { name: "Deploy and rollback", type: "Component", icon: "app",
+      tech: ["Terraform", "images"],
+      desc: "Add capacity or ship a hotfix, repeatably.",
+      blurb: "Infrastructure as code so adding gateway or worker capacity is a parameter change rather than a console session. Digest-pinned images so a hotfix is a version bump with a known rollback.",
+      metrics: [["Provisioning", "declarative", ""], ["Images", "digest-pinned", ""], ["Rollback", "previous digest", ""]],
+      note: "During the event, prefer adding capacity over changing code. A rollback path that has never been exercised is not a rollback path." },
+
+    authz: { name: "Accounts and audit", type: "Component", icon: "shield",
+      tech: ["Grafana", "SSO"],
+      desc: "Who may do what, and a record of who did.",
+      blurb: "Accounts, teams and role-based permissions, with every spend-bearing or state-changing action written to an audit log before it runs. Grafana provides most of this already, which is a good reason not to build a console.",
+      metrics: [["Model", "role-based", ""], ["Audit", "before the action", ""], ["Spend actions", "flagged", ""]],
+      note: "Write the audit entry before the action, not after. An entry records an intent, so it has to survive the attempt failing, otherwise the log only ever tells you about successes." },
+
+    /* ── Player components ── */
+    loader: { name: "Swarm loader", type: "Component", icon: "app",
+      tech: ["hls.js"],
+      desc: "Fetches manifests and segments from feeds, not URLs.",
+      blurb: "A custom hls.js loader that resolves the feed, pulls the current manifest and fetches segments by content address. This is the piece that makes the whole delivery model possible in an ordinary browser.",
+      metrics: [["Source", "gateway or own node", ""], ["Manifest merge", "across restarts", ""]],
+      note: "Native HLS on iOS Safari bypasses this entirely and fetches URLs itself, so iPhone viewers always take the gateway path." },
+
+    abr: { name: "ABR selector", type: "Component", icon: "app",
+      tech: ["4 rungs"],
+      desc: "Picks the rung. Matters most for the 70% on phones.",
+      blurb: "Switches between the four variants based on measured throughput and buffer health. Starts conservatively and climbs, because a viewer who never sees a stall forgives a lower opening rung.",
+      metrics: [["Rungs", "360 / 480 / 720 / 1080", ""], ["Start at", "480p", ""], ["Avg delivered", "1.8 Mbps", ""]],
+      note: "ABR over Swarm means the uploader writes variant playlists and the player switches between them through the Swarm loader. It is the largest single build item in the plan." },
+
+    tier: { name: "Tier selector", type: "Component", icon: "store",
+      tech: ["signed config"],
+      desc: "Gateway by default. Demotes on its own.",
+      blurb: "Reads a signed config feed for policy, caps and kill switches. Desktop with a healthy connection pool may opt into the browser node. Everyone else takes the gateway. Twenty seconds outside SLO drops a rung.",
+      metrics: [["Default", "gateway", ""], ["Demote after", "20 s", ""], ["Kill switch", "under 30 s", ""]],
+      note: "The kill switch is the safety property that makes the browser-node experiment acceptable at all. Reaching every viewer in under thirty seconds is the requirement." },
+
+    telemetry: { name: "Telemetry", type: "Component", icon: "eye",
+      tech: ["first-party"],
+      desc: "TTFF, rebuffer, chunk latency, pool size.",
+      blurb: "Without beacons there is no evidence, no Gate 2 decision and no talk afterwards. Privacy-clean and first-party by requirement, which is both an EF expectation and on-mission.",
+      metrics: [["Third-party trackers", "none", ""], ["Reports", "per session", ""]] }
+  };
+  for (const id in O) O[id].id = id;
+
+  const D = {
+    context: {
+      name: "Devcon 8 streaming", level: "Context", parent: null, w: 1000, h: 560,
+      nodes: [
+        { id: "av",      x: 30,  y: 232, w: 200, h: 112 },
+        { id: "sys",     x: 330, y: 190, w: 280, h: 186 },
+        { id: "swarm",   x: 720, y: 40,  w: 240, h: 140 },
+        { id: "yt",      x: 720, y: 214, w: 240, h: 128 },
+        { id: "viewers", x: 720, y: 378, w: 240, h: 128 }
+      ],
+      edges: [
+        { from: "av",    to: "sys",     label: "2 x SRT", strong: true },
+        { from: "sys",   to: "swarm",   label: "segments + feed", strong: true, t: .62 },
+        { from: "swarm", to: "sys",     label: "chunk retrieval", curve: 54 },
+        { from: "sys",   to: "yt",      label: "RTMP mirror", t: .55 },
+        { from: "sys",   to: "viewers", label: "HLS", strong: true, t: .62 },
+        { from: "yt",    to: "viewers", label: "fallback", curve: 34 }
+      ]
+    },
+
+    containers: {
+      name: "Solar Punk streaming", level: "Containers", parent: "context", of: "sys", w: 1130, h: 800,
+      nodes: [
+        { id: "av",       x: 25,  y: 288, w: 170, h: 100 },
+        { id: "ingest",   x: 240, y: 80,  w: 235, h: 140 },
+        { id: "pipeline", x: 240, y: 262, w: 235, h: 156 },
+        { id: "mirror",   x: 240, y: 462, w: 235, h: 132 },
+        { id: "swarm",    x: 545, y: 80,  w: 225, h: 140 },
+        { id: "fleet",    x: 545, y: 268, w: 225, h: 144 },
+        { id: "delivery", x: 845, y: 80,  w: 245, h: 140 },
+        { id: "player",   x: 845, y: 284, w: 245, h: 144 },
+        { id: "viewers",  x: 845, y: 492, w: 245, h: 118 },
+        { id: "ctrl",     x: 240, y: 650, w: 380, h: 130 },
+        { id: "netmon",   x: 690, y: 650, w: 240, h: 130 }
+      ],
+      edges: [
+        { from: "av",       to: "ingest",   label: "2 x SRT", strong: true },
+        { from: "ingest",   to: "pipeline", label: "routed by streamid", strong: true },
+        { from: "pipeline", to: "swarm",    label: "pushsync", strong: true },
+        { from: "pipeline", to: "mirror",   label: "RTMP" },
+        { from: "fleet",    to: "swarm",    label: "coverage + wss" },
+        { from: "swarm",    to: "delivery", label: "retrieval", strong: true },
+        { from: "delivery", to: "player",   label: "HLS + ABR", strong: true },
+        { from: "mirror",   to: "player",   label: "last resort", curve: 150 },
+        { from: "player",   to: "viewers",  label: "playback", strong: true },
+        { from: "ctrl",     to: "pipeline", label: "lease, stamps, config" },
+        { from: "netmon",   to: "swarm",    label: "observes", curve: 90 }
+      ]
+    },
+
+    stage: {
+      name: "Stage pipeline", level: "Components", parent: "containers", of: "pipeline", w: 1110, h: 620,
+      nodes: [
+        { id: "srtin",    x: 30,  y: 218, w: 200, h: 130 },
+        { id: "worker",   x: 290, y: 46,  w: 235, h: 146 },
+        { id: "packager", x: 290, y: 240, w: 235, h: 132 },
+        { id: "uploader", x: 290, y: 420, w: 235, h: 140 },
+        { id: "record",   x: 600, y: 46,  w: 215, h: 146 },
+        { id: "lease",    x: 600, y: 240, w: 215, h: 132 },
+        { id: "beepub",   x: 600, y: 420, w: 215, h: 140 },
+        { id: "swarm",    x: 885, y: 420, w: 195, h: 140 }
+      ],
+      edges: [
+        { from: "srtin",    to: "worker",   label: "decoded feed", strong: true },
+        { from: "srtin",    to: "record",   label: "local copy", curve: -70 },
+        { from: "worker",   to: "packager", label: "4 renditions", strong: true },
+        { from: "packager", to: "uploader", label: "2 s segments", strong: true },
+        { from: "uploader", to: "beepub",   label: "stamped chunks", strong: true },
+        { from: "beepub",   to: "swarm",    label: "pushsync", strong: true },
+        { from: "lease",    to: "uploader", label: "arms signing" }
+      ]
+    },
+
+    deliv: {
+      name: "Delivery tier", level: "Components", parent: "containers", of: "delivery", w: 900, h: 600,
+      nodes: [
+        { id: "swarm",       x: 30,  y: 200, w: 200, h: 140 },
+        { id: "allow",       x: 290, y: 30,  w: 225, h: 130 },
+        { id: "beegw",       x: 290, y: 196, w: 225, h: 148 },
+        { id: "browsernode", x: 290, y: 396, w: 225, h: 148 },
+        { id: "shield",      x: 590, y: 60,  w: 225, h: 140 },
+        { id: "cdn",         x: 590, y: 250, w: 225, h: 150 }
+      ],
+      edges: [
+        { from: "swarm",  to: "beegw",       label: "chunk retrieval", strong: true },
+        { from: "allow",  to: "beegw",       label: "what may be served" },
+        { from: "beegw",  to: "shield",      label: "unique content once", strong: true },
+        { from: "shield", to: "cdn",         label: "tiered cache", strong: true },
+        { from: "swarm",  to: "browsernode", label: "direct fetch", curve: 70 }
+      ]
+    },
+
+    control: {
+      name: "Control plane", level: "Components", parent: "containers", of: "ctrl", w: 960, h: 620,
+      nodes: [
+        { id: "probes",    x: 30,  y: 40,  w: 220, h: 140 },
+        { id: "metrics",   x: 30,  y: 226, w: 220, h: 132 },
+        { id: "logs",      x: 30,  y: 404, w: 220, h: 132 },
+        { id: "stamps",    x: 330, y: 40,  w: 240, h: 146 },
+        { id: "cheq",      x: 330, y: 232, w: 240, h: 132 },
+        { id: "alerts",    x: 330, y: 410, w: 240, h: 132 },
+        { id: "runofshow", x: 650, y: 40,  w: 230, h: 146 },
+        { id: "deploy",    x: 650, y: 232, w: 230, h: 132 },
+        { id: "authz",     x: 650, y: 410, w: 230, h: 132 }
+      ],
+      edges: [
+        { from: "probes",  to: "metrics",   label: "viewer-eye SLOs", strong: true },
+        { from: "metrics", to: "alerts",    label: "thresholds", strong: true },
+        { from: "logs",    to: "alerts",    label: "error rates" },
+        { from: "stamps",  to: "alerts",    label: "TTL + utilisation", strong: true },
+        { from: "cheq",    to: "alerts",    label: "balance floor" },
+        { from: "alerts",  to: "runofshow", label: "incident", strong: true },
+        { from: "authz",   to: "deploy",    label: "who may change what" }
+      ]
+    },
+
+    play: {
+      name: "Player", level: "Components", parent: "containers", of: "player", w: 880, h: 470,
+      nodes: [
+        { id: "delivery",  x: 30,  y: 175, w: 200, h: 140 },
+        { id: "loader",    x: 290, y: 40,  w: 235, h: 150 },
+        { id: "abr",       x: 290, y: 240, w: 235, h: 150 },
+        { id: "tier",      x: 600, y: 40,  w: 220, h: 150 },
+        { id: "telemetry", x: 600, y: 240, w: 220, h: 150 }
+      ],
+      edges: [
+        { from: "delivery",  to: "loader",    label: "segments", strong: true },
+        { from: "loader",    to: "abr",       label: "throughput + buffer", strong: true },
+        { from: "tier",      to: "loader",    label: "which source", strong: true },
+        { from: "loader",    to: "telemetry", label: "QoE beacons" },
+        { from: "telemetry", to: "tier",      label: "demote signal", curve: -80 }
+      ]
+    }
+  };
+  for (const id in D) D[id].id = id;
+
+  /* ══ Scenarios ═════════════════════════════════════════════════════════
+     Two happy paths and six incidents. Each incident ends on a runbook step,
+     because "what do we actually do" is the part EF is really asking about. */
+
+  const FLOWS = {
+    segment: {
+      name: "A segment's journey", kind: "normal",
+      about: "Follow two seconds of video from a stage camera to a viewer's screen.",
+      steps: [
+        { d: "context",    edge: "av>sys",            text: "A stage encoder pushes its produced feed to our ingest over SRT, with a passphrase and a streamid unique to that stage." },
+        { d: "stage",      edge: "srtin>worker",      text: "The receiver checks the streamid, then hands the feed to that stage's own transcode worker. No other stage shares it." },
+        { d: "stage",      edge: "worker>packager",   text: "One 8 Mbps feed becomes four rungs: 360p, 480p, 720p and 1080p. The lower two carry most of the audience." },
+        { d: "stage",      edge: "packager>uploader", text: "HLS cuts 2 second segments exactly on the encoder's keyframes, which is why the fixed closed GOP was in the contribution spec." },
+        { d: "stage",      edge: "uploader>beepub",   text: "Each segment is chunked and stamped, ready to push." },
+        { d: "stage",      edge: "beepub>swarm",      text: "A 750 KB segment scatters into 183 chunks landing in 183 different neighborhoods, then the signed feed is updated to point at the new manifest." },
+        { d: "containers", edge: "swarm>delivery",    text: "An origin gateway fetches that segment from Swarm exactly once." },
+        { d: "containers", edge: "delivery>player",   text: "The CDN serves that single fetch to everyone watching. Swarm load is now independent of how many people show up." }
+      ]
+    },
+
+    viewer: {
+      name: "A viewer opens the page", kind: "normal",
+      about: "What happens on a phone in Mumbai between tapping the link and seeing video.",
+      steps: [
+        { d: "play",       edge: "tier>loader",      text: "The player reads a signed config feed: gateway list, tier policy, caps and the mirror URL." },
+        { d: "play",       edge: "delivery>loader",  text: "Seventy percent of viewers are on mobile, and iOS cannot run a browser node at all, so almost everyone takes the gateway path." },
+        { d: "play",       edge: "loader>abr",       text: "The Swarm loader resolves the feed, pulls the current manifest, and ABR starts at 480p rather than gambling on 1080p." },
+        { d: "play",       edge: "loader>telemetry", text: "Time to first frame, rebuffer ratio and chunk latency go back as beacons. Without these there is no Gate 2 evidence and no talk." },
+        { d: "containers", edge: "player>viewers",   text: "Glass to glass lands around 10 to 15 seconds on standard HLS, which EF has not objected to." }
+      ]
+    },
+
+    stagedown: {
+      name: "A stage goes offline", kind: "incident",
+      about: "The venue hop fails. The link we do not own, and the one most likely to break.",
+      steps: [
+        { d: "stage",      edge: "srtin>worker",     text: "DETECT. The SRT socket drops. Within ten seconds the manifest stops advancing and the synthetic prober notices." },
+        { d: "containers", edge: "av>ingest",        text: "CONTAIN. The encoder's second SRT output is already live into the other availability zone, so the second path takes over with no state to move." },
+        { d: "stage",      edge: "srtin>record",     text: "PROTECT. Local recording keeps running regardless, so the archive does not inherit the gap even though the live stream did." },
+        { d: "control",    edge: "alerts>runofshow", text: "ESCALATE. That stage flips to degraded on the run-of-show board and the on-call is paged. The other nineteen stages are untouched." },
+        { d: "containers", edge: "mirror>player",    text: "FALL BACK. If both SRT paths are down, viewers on that stage move to the YouTube mirror, which has been hot since the morning." },
+        { d: "containers", edge: "ctrl>pipeline",    runbook: true, text: "RUNBOOK. The venue hop is EF's to fix and the contract should say so. Our job is to keep the mirror up, keep recording, and splice the recording into the archive after the event." }
+      ]
+    },
+
+    workerdies: {
+      name: "A transcode worker dies", kind: "incident",
+      about: "Compute failure. The case per-stage isolation exists to handle.",
+      steps: [
+        { d: "stage",      edge: "worker>packager",  text: "DETECT. The worker process dies and its stage stops producing segments. Last segment age starts climbing on the board." },
+        { d: "containers", edge: "ingest>pipeline",  text: "CONTAIN. Blast radius is exactly one stage, because every stage has its own worker. This is what per-stage isolation bought us." },
+        { d: "control",    edge: "metrics>alerts",   text: "RESPOND. N+2 spare capacity means a spare worker is already running and idle. Nothing has to be provisioned under pressure." },
+        { d: "stage",      edge: "srtin>worker",     text: "RECOVER. The ingest edge re-routes that streamid to the spare. Viewers see a two to four second discontinuity and the stream continues." },
+        { d: "control",    edge: "alerts>runofshow", runbook: true, text: "RUNBOOK. No human action is needed while spares exist. Page only when the spare pool drops below one, and add capacity rather than debugging live." }
+      ]
+    },
+
+    stampfills: {
+      name: "The postage batch fills", kind: "incident",
+      about: "The quiet one. Measured on our own stage, and it does not announce itself.",
+      steps: [
+        { d: "stage",   edge: "uploader>beepub",  text: "THE TRAP. A full batch does not stop publishing. Only the fullest buckets refuse, so the stream keeps going with holes in it while every log line still says success." },
+        { d: "stage",   edge: "beepub>swarm",     text: "MEASURED. An immutable batch on our own stage filled 6.5 stream-hours in, not the 2.3 predicted. Practical capacity is about a third of the arithmetic." },
+        { d: "control", edge: "stamps>alerts",    text: "DETECT. Watch bucket utilisation, never wait for a 402. Warn at 85%, and watch TTL separately at 14 days and 7 days." },
+        { d: "control", edge: "alerts>runofshow", text: "RESPOND. Dilute the batch before it saturates. Buy mutable rather than immutable, because a mutable batch recycles and an immutable one simply dies." },
+        { d: "stage",   edge: "beepub>swarm",     runbook: true, text: "RUNBOOK. A feed that develops a hole caps every reader permanently and no later fix repairs it. This is the most important thing to monitor and the easiest to miss." }
+      ]
+    },
+
+    underattack: {
+      name: "Under attack", kind: "incident",
+      about: "Assume we are targeted. The realistic attack is not the one most people expect.",
+      steps: [
+        { d: "containers", edge: "swarm>delivery", text: "THE REAL RISK. The likely attack is not knocking us offline, it is running up the egress bill. Bandwidth is the thing that costs money on demand." },
+        { d: "deliv",      edge: "shield>cdn",     text: "ABSORB. The CDN takes volumetric traffic. This is what a CDN is built for and it is why we sit behind one rather than serving viewers ourselves." },
+        { d: "deliv",      edge: "allow>beegw",    text: "REDUCE SURFACE. The reference allowlist means the gateway serves our feeds and refuses everything else, so it cannot be used as a free open proxy for arbitrary Swarm content." },
+        { d: "control",    edge: "metrics>alerts", text: "DETECT. Alarm on egress rate and requests per IP, with a hard ceiling that trips before the budget does. The cap is the real circuit breaker." },
+        { d: "control",    edge: "authz>deploy",   runbook: true, text: "RUNBOOK. Rate limit first, then block by ASN or region at the CDN. Never expose the Bee write API, since a Bee API can buy postage and therefore spend money. Keys stay in a vault, never on a VM." }
+      ]
+    },
+
+    swarmdegrades: {
+      name: "Swarm retrieval degrades", kind: "incident",
+      about: "The network gets slow. The risk we accept by being decentralized first.",
+      steps: [
+        { d: "containers", edge: "swarm>delivery",    text: "DETECT. Gateway origin-fetch p95 crosses 1.2 seconds and the retrieval timeout rate passes 1%. The cold-cache probe sees it before viewers do." },
+        { d: "containers", edge: "fleet>swarm",       text: "STEP 1. Add warm fleet nodes near the neighborhoods holding our content and raise Bee cache capacity. Cheap and reversible." },
+        { d: "deliv",      edge: "swarm>browsernode", text: "STEP 2. Cap or kill the in-browser tier. It is the only Swarm load we directly control, so it is the first thing to give up." },
+        { d: "containers", edge: "delivery>player",   text: "STEP 3. Viewers stay on the gateway path, which is already the default for 95% of them, and the CDN keeps serving cached segments regardless." },
+        { d: "containers", edge: "mirror>player",     text: "STEP 4. If the publish path itself is down for more than 60 seconds, the player moves to the mirror. Degraded, but never dark." },
+        { d: "containers", edge: "ctrl>pipeline",     runbook: true, text: "RUNBOOK. The kill switch reaches every viewer in under 30 seconds. Use it early rather than late. Nobody has ever regretted demoting a tier too soon during a live event." }
+      ]
+    },
+
+    splitbrain: {
+      name: "Split-brain averted", kind: "incident",
+      about: "The failure that is worse than an outage, because it cannot be undone.",
+      steps: [
+        { d: "stage",   edge: "lease>uploader",  text: "THE RULE. Only the lease holder signs feed updates. A standby may transcode all it likes, but it never signs." },
+        { d: "stage",   edge: "uploader>beepub", text: "THE RISK. If two uploaders ever sign the same feed, its index forks. Readers land on different branches and the manifest stops making sense." },
+        { d: "stage",   edge: "beepub>swarm",    text: "WHY IT MATTERS. A forked feed is not a temporary outage, it is permanent archive corruption. Content addressing means there is nothing to overwrite and no repair." },
+        { d: "control", edge: "authz>deploy",    text: "CONTROL. The lease is a short TTL record the control plane arbitrates. Lose it and signing stops immediately, before any replacement starts." },
+        { d: "stage",   edge: "lease>uploader",  runbook: true, text: "RUNBOOK. Never hand-start a second uploader against a live feed, not even to fix something. Take the gap instead. A gap is recoverable and a fork is not." }
+      ]
+    }
+  };
+  for (const id in FLOWS) FLOWS[id].id = id;
+
+  /* ══ Engine ═══════════════════════════════════════════════════════════ */
+
+  const app      = document.getElementById("app");
+  const viewport = document.getElementById("viewport");
+  const world    = document.getElementById("world");
+  const grid     = document.getElementById("grid");
+  const svg      = document.getElementById("edges");
+  const detail   = document.getElementById("detail");
+  const flowbar  = document.getElementById("flowbar");
+  const scenmenu = document.getElementById("scenmenu");
+  const scenbtn  = document.getElementById("scenbtn");
+  const NS       = "http://www.w3.org/2000/svg";
+
+  const MIN_K = 0.16, MAX_K = 2.4;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const narrow  = matchMedia("(max-width: 1000px)");
+
+  let cur = "context";
+  let k = 1, tx = 0, ty = 0;
+  let sel = null;
+  let flow = null, flowIx = -1, flowTimer = null;
+
+  const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const ico = (n, cls) =>
+    `<svg class="${cls}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n] || ICON.app}</svg>`;
+
+  /* ── Rendering ─────────────────────────────────────────────────────── */
+  function render(dg) {
+    const d = D[dg];
+    cur = dg;
+
+    world.querySelectorAll(".obj").forEach(n => n.remove());
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    svg.setAttribute("width", d.w);
+    svg.setAttribute("height", d.h);
+    svg.setAttribute("viewBox", `0 0 ${d.w} ${d.h}`);
+    world.style.width = d.w + "px";
+    world.style.height = d.h + "px";
+
+    const pos = new Map(d.nodes.map(n => [n.id, n]));
+
+    for (const e of d.edges) {
+      const a = pos.get(e.from), b = pos.get(e.to);
+      if (!a || !b) continue;
+
+      // Leave from whichever side faces the target, so lines do not cross boxes.
+      const dx = (b.x + b.w / 2) - (a.x + a.w / 2);
+      const dy = (b.y + b.h / 2) - (a.y + a.h / 2);
+      const horiz = Math.abs(dx) > Math.abs(dy);
+      let x1, y1, x2, y2;
+      if (horiz) {
+        const right = dx > 0;
+        x1 = right ? a.x + a.w : a.x; y1 = a.y + a.h / 2;
+        x2 = right ? b.x : b.x + b.w; y2 = b.y + b.h / 2;
+      } else {
+        const down = dy > 0;
+        x1 = a.x + a.w / 2; y1 = down ? a.y + a.h : a.y;
+        x2 = b.x + b.w / 2; y2 = down ? b.y : b.y + b.h;
+      }
+
+      const c = e.curve || 0;
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      const dstr = horiz
+        ? `M ${x1} ${y1} C ${mx} ${y1 + c}, ${mx} ${y2 + c}, ${x2} ${y2}`
+        : `M ${x1} ${y1} C ${x1 + c} ${my}, ${x2 + c} ${my}, ${x2} ${y2}`;
+
+      const g = document.createElementNS(NS, "g");
+      g.setAttribute("class", "edge-grp");
+      g.dataset.key = e.from + ">" + e.to;
+
+      const hit = document.createElementNS(NS, "path");
+      hit.setAttribute("class", "edge-hit");
+      hit.setAttribute("d", dstr);
+      g.appendChild(hit);
+
+      const p = document.createElementNS(NS, "path");
+      p.setAttribute("class", "edge" + (e.strong ? " strong" : ""));
+      p.setAttribute("d", dstr);
+      g.appendChild(p);
+
+      svg.appendChild(g);
+
+      // Sit the label on the real curve so it lands between boxes rather than
+      // at a straight-line midpoint that a box may be covering.
+      const at = p.getPointAtLength(p.getTotalLength() * (e.t || 0.5));
+      const t = document.createElementNS(NS, "text");
+      t.setAttribute("class", "edge-lbl");
+      t.setAttribute("x", at.x);
+      t.setAttribute("y", at.y - 7);
+      t.setAttribute("text-anchor", "middle");
+      t.textContent = e.label;
+      g.appendChild(t);
+    }
+
+    for (const n of d.nodes) {
+      const o = O[n.id];
+      if (!o) continue;
+
+      const el = document.createElement("div");
+      el.className = "obj" + (o.external ? " external" : "") + (o.type.includes("actor") ? " actor" : "");
+      el.dataset.id = o.id;
+      el.setAttribute("role", "button");
+      el.setAttribute("tabindex", "0");
+      Object.assign(el.style, { left: n.x + "px", top: n.y + "px", width: n.w + "px", height: n.h + "px" });
+
+      el.innerHTML =
+        `<div class="obj-top">${ico(o.icon, "obj-ico")}<span class="obj-name">${esc(o.name)}</span></div>` +
+        `<span class="obj-type">${esc(o.type)}</span>` +
+        `<span class="obj-desc">${esc(o.desc)}</span>` +
+        `<div class="obj-foot">` +
+          (o.blast ? `<span class="blast">blast ${esc(o.blast)}</span>` : "") +
+          (o.tech || []).map(t => `<span class="tech">${esc(t)}</span>`).join("") +
+        `</div>`;
+
+      if (o.drill && D[o.drill]) {
+        const inner = D[o.drill].nodes.filter(x => O[x.id] && !O[x.id].external).length;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "drill";
+        b.dataset.drill = o.drill;
+        b.setAttribute("aria-label", `Open the ${o.name} diagram, ${inner} objects inside`);
+        b.innerHTML =
+          `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+             <circle cx="7" cy="7" r="4.4"/><path d="M10.4 10.4 14 14M5.2 7h3.6M7 5.2v3.6"/>
+           </svg>${inner}`;
+        el.appendChild(b);
+      }
+
+      world.appendChild(el);
+    }
+
+    buildCrumbs();
+    buildTree();
+    fit();
+    if (sel) markSel(sel);
+  }
+
+  /* ── Camera ────────────────────────────────────────────────────────── */
+  function apply() {
+    world.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`;
+    const cell = 26 * k;
+    grid.style.backgroundSize = `${cell}px ${cell}px`;
+    grid.style.backgroundPosition = `${tx}px ${ty}px`;
+  }
+
+  function zoomAt(cx, cy, f) {
+    const k2 = clamp(k * f, MIN_K, MAX_K);
+    if (k2 === k) return;
+    const r = k2 / k;
+    tx = cx - (cx - tx) * r;
+    ty = cy - (cy - ty) * r;
+    k = k2;
+    apply();
+  }
+
+  function glide(nk, nx, ny) {
+    // No frames in a hidden tab, so land on the target rather than never move.
+    if (reduced || document.hidden) { k = nk; tx = nx; ty = ny; apply(); return; }
+    const k0 = k, x0 = tx, y0 = ty, t0 = performance.now(), dur = 420;
+    (function step(now) {
+      const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      k = k0 + (nk - k0) * e; tx = x0 + (nx - x0) * e; ty = y0 + (ny - y0) * e;
+      apply();
+      if (p < 1) requestAnimationFrame(step);
+    })(t0);
+  }
+
+  function frame(x, y, w, h, pad, animate, maxK = MAX_K) {
+    const vw = viewport.clientWidth, vh = viewport.clientHeight;
+    // On the first render the grid has not resolved and both read 0, which
+    // would clamp the scale to MIN_K and strand the diagram in a corner.
+    if (vw <= 0 || vh <= 0) { setTimeout(() => frame(x, y, w, h, pad, false, maxK), 0); return; }
+    const nk = clamp(Math.min((vw - pad * 2) / w, (vh - pad * 2) / h), MIN_K, maxK);
+    const nx = (vw - w * nk) / 2 - x * nk, ny = (vh - h * nk) / 2 - y * nk;
+    if (animate) glide(nk, nx, ny); else { k = nk; tx = nx; ty = ny; apply(); }
+  }
+
+  const fit = (animate = false) => frame(0, 0, D[cur].w, D[cur].h, 46, animate, 1);
+
+  /* ── Navigation ────────────────────────────────────────────────────── */
+  function goTo(dg, keepSel) {
+    if (!D[dg] || dg === cur) return;
+    if (!keepSel) { sel = null; closeDetail(); }
+    if (reduced || document.hidden) { render(dg); return; }
+    world.classList.add("swapping");
+    setTimeout(() => { render(dg); world.classList.remove("swapping"); }, 170);
+  }
+
+  function chain(dg) {
+    const out = [];
+    for (let x = dg; x; x = D[x].parent) out.unshift(x);
+    return out;
+  }
+
+  function buildCrumbs() {
+    const nav = document.getElementById("crumbs");
+    nav.innerHTML = "";
+    chain(cur).forEach((id, i, arr) => {
+      if (i) {
+        const s = document.createElement("span");
+        s.className = "crumb-sep";
+        s.textContent = "/";
+        nav.appendChild(s);
+      }
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "crumb";
+      const last = i === arr.length - 1;
+      if (last) b.setAttribute("aria-current", "true");
+      b.innerHTML = `<span class="crumb-lvl">${esc(D[id].level)}</span>${esc(D[id].name)}`;
+      if (!last) b.onclick = () => goTo(id);
+      nav.appendChild(b);
+    });
+  }
+
+  function buildTree() {
+    const t = document.getElementById("tree");
+    t.innerHTML = '<div class="tree-k">Model</div>';
+
+    const row = (dgId, objId, depth) => {
+      const d = dgId ? D[dgId] : null;
+      const o = objId ? O[objId] : null;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "tw depth-" + depth + (dgId && dgId === cur ? " on" : "");
+      b.innerHTML = `<i class="dot"></i><span class="nm">${esc(d ? d.name : o.name)}</span>` +
+                    (d ? `<span class="cnt">${d.nodes.length}</span>` : "");
+      b.onclick = () => {
+        if (d) goTo(dgId); else { select(objId); focusObj(objId); }
+        if (narrow.matches) setTree(false);
+      };
+      t.appendChild(b);
+    };
+
+    row("context", null, 0);
+    row("containers", "sys", 1);
+    for (const n of D.containers.nodes) {
+      const o = O[n.id];
+      if (!o || o.external) continue;
+      row(o.drill && D[o.drill] ? o.drill : null, n.id, 2);
+    }
+  }
+
+  /* ── Selection ─────────────────────────────────────────────────────── */
+  function markSel(id) {
+    world.querySelectorAll(".obj").forEach(el => el.classList.toggle("sel", el.dataset.id === id));
+  }
+
+  function connectionsOf(id) {
+    const out = [], seen = new Set();
+    for (const dgId in D) {
+      for (const e of D[dgId].edges) {
+        let c = null;
+        if (e.from === id && O[e.to]) c = { dir: "out", other: e.to, label: e.label };
+        else if (e.to === id && O[e.from]) c = { dir: "in", other: e.from, label: e.label };
+        if (!c) continue;
+        const key = c.dir + c.other + c.label;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(c);
+      }
+    }
+    return out;
+  }
+
+  /** Scenarios whose steps touch this object, so the panel doubles as a way in. */
+  function flowsTouching(id) {
+    return Object.values(FLOWS).filter(f =>
+      f.steps.some(s => s.edge && s.edge.split(">").includes(id)));
+  }
+
+  function select(id) {
+    const o = O[id];
+    if (!o) return;
+    sel = id;
+    markSel(id);
+
+    document.getElementById("d-type").textContent = o.type;
+    document.getElementById("d-name").textContent = o.name;
+    document.getElementById("d-row").innerHTML =
+      (o.blast ? `<span class="blast">blast ${esc(o.blast)}</span>` : "") +
+      (o.tech || []).map(t => `<span class="tech">${esc(t)}</span>`).join("");
+
+    let html = `<p>${esc(o.blurb || o.desc)}</p>`;
+
+    if (o.drill && D[o.drill] && o.drill !== cur) {
+      html += `<button type="button" class="d-drill" data-drill="${o.drill}">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <circle cx="7" cy="7" r="4.4"/><path d="M10.4 10.4 14 14M5.2 7h3.6M7 5.2v3.6"/>
+        </svg>Open the ${esc(D[o.drill].level.toLowerCase())} diagram</button>`;
+    }
+
+    if (o.metrics && o.metrics.length) {
+      html += `<div><div class="d-k">Numbers</div><dl class="kv">` +
+        o.metrics.map(m => `<dt>${esc(m[0])}</dt><dd class="${m[2] || ""}">${esc(m[1])}</dd>`).join("") +
+        `</dl></div>`;
+    }
+
+    const cx = connectionsOf(id);
+    if (cx.length) {
+      html += `<div><div class="d-k">Connections</div>` + cx.map(c =>
+        `<div class="conn"><span class="ar">${c.dir === "out" ? "&rarr;" : "&larr;"}</span>` +
+        `<button type="button" data-goto="${c.other}"><span class="to">${esc(O[c.other].name)}</span></button>` +
+        `<span class="via">${esc(c.label)}</span></div>`).join("") + `</div>`;
+    }
+
+    const fl = flowsTouching(id);
+    if (fl.length) {
+      html += `<div><div class="d-k">Seen in these scenarios</div>` + fl.map(f =>
+        `<button type="button" class="d-scen" data-flow="${f.id}" data-kind="${f.kind}">` +
+        `<i></i>${esc(f.name)}</button>`).join("") + `</div>`;
+    }
+
+    if (o.note) html += `<div><div class="d-k">Why it matters</div><p class="note">${esc(o.note)}</p></div>`;
+
+    const body = document.getElementById("d-body");
+    body.innerHTML = html;
+    body.scrollTop = 0;
+
+    app.classList.add("detail-open");
+    detail.setAttribute("aria-hidden", "false");
+    keepVisible(id);
+  }
+
+  /** The panel takes a grid column, which can cover the object that was just
+      clicked. Pan only when it actually does, so clicks do not feel jumpy.
+      Deferred by a task rather than a frame, since rAF never fires hidden. */
+  function keepVisible(id) {
+    const n = D[cur].nodes.find(x => x.id === id);
+    if (!n) return;
+    setTimeout(() => {
+      const over = (tx + (n.x + n.w) * k) - (viewport.clientWidth - 24);
+      if (over > 0) glide(k, tx - over, ty);
+    }, 0);
+  }
+
+  function closeDetail() {
+    app.classList.remove("detail-open");
+    detail.setAttribute("aria-hidden", "true");
+    sel = null;
+    world.querySelectorAll(".sel").forEach(el => el.classList.remove("sel"));
+  }
+
+  function focusObj(id) {
+    const here = D[cur].nodes.find(n => n.id === id);
+    if (here) { frame(here.x - 120, here.y - 100, here.w + 240, here.h + 200, 40, true); return; }
+    for (const dgId in D) {
+      if (!D[dgId].nodes.some(n => n.id === id)) continue;
+      sel = id;
+      goTo(dgId, true);
+      setTimeout(() => { select(id); focusObj(id); }, 230);
+      return;
+    }
+  }
+
+  /* ── Scenarios ─────────────────────────────────────────────────────── */
+  function buildScenMenu() {
+    const groups = [
+      ["How it works", Object.values(FLOWS).filter(f => f.kind === "normal")],
+      ["When it breaks", Object.values(FLOWS).filter(f => f.kind === "incident")]
+    ];
+    scenmenu.innerHTML = groups.map(([label, list]) =>
+      `<div class="scen-k">${label}</div>` + list.map(f =>
+        `<button type="button" class="scen" role="menuitem" data-flow="${f.id}" data-kind="${f.kind}">` +
+        `<b>${esc(f.name)}</b><span>${esc(f.about)}</span></button>`).join("")).join("");
+  }
+
+  function paintFlow(step) {
+    svg.querySelectorAll(".edge-grp").forEach(g => {
+      const on = g.dataset.key === step.edge;
+      g.classList.toggle("hl", on);
+      g.classList.toggle("dim", !on);
+    });
+    const parts = (step.edge || "").split(">");
+    world.querySelectorAll(".obj").forEach(el => {
+      const on = parts.includes(el.dataset.id);
+      el.classList.toggle("hl", on);
+      el.classList.toggle("dim", !on);
+    });
+  }
+
+  function flowShow(i) {
+    if (!flow) return;
+    flowIx = (i + flow.steps.length) % flow.steps.length;
+    const s = flow.steps[flowIx];
+
+    document.getElementById("flowcount").textContent = `step ${flowIx + 1} of ${flow.steps.length}`;
+    const cap = document.getElementById("flowstep");
+    cap.textContent = s.text;
+    cap.classList.toggle("runbook", !!s.runbook);
+
+    document.getElementById("flowdots").innerHTML = flow.steps.map((_, j) =>
+      `<i class="${j === flowIx ? "now" : j < flowIx ? "done" : ""}" data-step="${j}"></i>`).join("");
+
+    if (s.d !== cur) { goTo(s.d, true); setTimeout(() => paintFlow(s), 230); }
+    else paintFlow(s);
+  }
+
+  function flowClear() {
+    svg.querySelectorAll(".edge-grp").forEach(g => g.classList.remove("hl", "dim"));
+    world.querySelectorAll(".obj").forEach(el => el.classList.remove("hl", "dim"));
+  }
+
+  function flowPlay(on) {
+    clearInterval(flowTimer);
+    flowTimer = null;
+    const icon = document.querySelector("#fplay svg");
+    if (on) {
+      icon.innerHTML = '<path d="M4 3h3v10H4zM9 3h3v10H9z"/>';
+      flowTimer = setInterval(() => {
+        // Stop at the end rather than looping, so the runbook is the last word.
+        if (flowIx >= flow.steps.length - 1) { flowPlay(false); return; }
+        flowShow(flowIx + 1);
+      }, 5200);
+    } else {
+      icon.innerHTML = '<path d="M4 3v10l9-5z"/>';
+    }
+  }
+
+  function flowStart(id) {
+    flow = FLOWS[id];
+    if (!flow) return;
+    closeScenMenu();
+    closeDetail();
+    flowbar.classList.add("on");
+    app.classList.add("flowing");
+    app.classList.toggle("incident", flow.kind === "incident");
+    scenbtn.classList.add("on");
+    document.getElementById("flowname").textContent = flow.name;
+    flowShow(0);
+    flowPlay(true);
+  }
+
+  function flowStop() {
+    flowbar.classList.remove("on");
+    app.classList.remove("flowing", "incident");
+    scenbtn.classList.remove("on");
+    flowPlay(false);
+    flow = null; flowIx = -1;
+    flowClear();
+  }
+
+  function closeScenMenu() {
+    scenmenu.classList.remove("open");
+    scenbtn.setAttribute("aria-expanded", "false");
+  }
+  function toggleScenMenu() {
+    const open = scenmenu.classList.toggle("open");
+    scenbtn.setAttribute("aria-expanded", String(open));
+  }
+
+  /* ── Input ─────────────────────────────────────────────────────────── */
+  let dragging = false, moved = 0, lx = 0, ly = 0, pinch = 0;
+  const pts = new Map();
+
+  viewport.addEventListener("pointerdown", e => {
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2) {
+      const [p, q] = [...pts.values()];
+      pinch = Math.hypot(p.x - q.x, p.y - q.y);
+      dragging = false;
+      return;
+    }
+    dragging = true; moved = 0; lx = e.clientX; ly = e.clientY;
+    viewport.classList.add("dragging");
+    viewport.setPointerCapture(e.pointerId);
+  });
+
+  viewport.addEventListener("pointermove", e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2) {
+      const [p, q] = [...pts.values()];
+      const dist = Math.hypot(p.x - q.x, p.y - q.y);
+      if (pinch > 0) {
+        const b = viewport.getBoundingClientRect();
+        zoomAt((p.x + q.x) / 2 - b.left, (p.y + q.y) / 2 - b.top, dist / pinch);
+      }
+      pinch = dist;
+      return;
+    }
+    if (!dragging) return;
+    const dx = e.clientX - lx, dy = e.clientY - ly;
+    moved += Math.abs(dx) + Math.abs(dy);
+    tx += dx; ty += dy; lx = e.clientX; ly = e.clientY;
+    apply();
+  });
+
+  const endPt = e => {
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinch = 0;
+    dragging = false;
+    viewport.classList.remove("dragging");
+  };
+  viewport.addEventListener("pointerup", endPt);
+  viewport.addEventListener("pointercancel", endPt);
+
+  viewport.addEventListener("wheel", e => {
+    e.preventDefault();
+    const b = viewport.getBoundingClientRect();
+    zoomAt(e.clientX - b.left, e.clientY - b.top, Math.exp(-e.deltaY * (e.ctrlKey ? 0.011 : 0.0021)));
+  }, { passive: false });
+
+  viewport.addEventListener("click", e => {
+    if (moved > 6) return;
+    closeScenMenu();
+    if (narrow.matches && app.classList.contains("tree-open")) setTree(false);
+    const drill = e.target.closest("[data-drill]");
+    if (drill) { e.stopPropagation(); goTo(drill.dataset.drill); return; }
+    const obj = e.target.closest(".obj");
+    if (obj) { select(obj.dataset.id); return; }
+    const edge = e.target.closest(".edge-grp");
+    if (edge) { select(edge.dataset.key.split(">")[0]); return; }
+    closeDetail();
+  });
+
+  world.addEventListener("keydown", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const drill = e.target.closest(".drill");
+    if (drill) { e.preventDefault(); goTo(drill.dataset.drill); return; }
+    const obj = e.target.closest(".obj");
+    if (!obj) return;
+    e.preventDefault();
+    select(obj.dataset.id);
+  });
+
+  document.getElementById("d-body").addEventListener("click", e => {
+    const drill = e.target.closest("[data-drill]");
+    if (drill) { goTo(drill.dataset.drill, true); return; }
+    const fl = e.target.closest("[data-flow]");
+    if (fl) { flowStart(fl.dataset.flow); return; }
+    const go = e.target.closest("[data-goto]");
+    if (go) { select(go.dataset.goto); focusObj(go.dataset.goto); }
+  });
+
+  scenmenu.addEventListener("click", e => {
+    const b = e.target.closest("[data-flow]");
+    if (b) flowStart(b.dataset.flow);
+  });
+
+  document.getElementById("flowdots").addEventListener("click", e => {
+    const d = e.target.closest("[data-step]");
+    if (d) { flowPlay(false); flowShow(Number(d.dataset.step)); }
+  });
+
+  addEventListener("keydown", e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    switch (e.key) {
+      case "Escape":
+        if (scenmenu.classList.contains("open")) closeScenMenu();
+        else if (flow) flowStop();
+        else closeDetail();
+        break;
+      case "f": case "F": fit(true); break;
+      case "t": case "T": setTree(!app.classList.contains("tree-open")); break;
+      case "s": case "S": toggleScenMenu(); break;
+      case "+": case "=": zoomAt(viewport.clientWidth / 2, viewport.clientHeight / 2, 1.25); break;
+      case "-": case "_": zoomAt(viewport.clientWidth / 2, viewport.clientHeight / 2, 0.8); break;
+      case "Backspace": { const p = D[cur].parent; if (p) goTo(p); break; }
+      case "ArrowRight": if (!flow) return; flowPlay(false); flowShow(flowIx + 1); break;
+      case "ArrowLeft":  if (!flow) return; flowPlay(false); flowShow(flowIx - 1); break;
+      default: return;
+    }
+    e.preventDefault();
+  });
+
+  document.getElementById("zin").onclick  = () => zoomAt(viewport.clientWidth / 2, viewport.clientHeight / 2, 1.3);
+  document.getElementById("zout").onclick = () => zoomAt(viewport.clientWidth / 2, viewport.clientHeight / 2, 0.77);
+  document.getElementById("zfit").onclick = () => fit(true);
+  document.getElementById("d-close").onclick = closeDetail;
+  document.getElementById("fnext").onclick = () => { flowPlay(false); flowShow(flowIx + 1); };
+  document.getElementById("fprev").onclick = () => { flowPlay(false); flowShow(flowIx - 1); };
+  document.getElementById("fstop").onclick = flowStop;
+  document.getElementById("fplay").onclick = () => flowPlay(!flowTimer);
+  document.getElementById("hintclose").onclick = () => document.getElementById("hint").classList.add("gone");
+  scenbtn.onclick = e => { e.stopPropagation(); toggleScenMenu(); };
+
+  /* ── Model tree visibility ───────────────────────────────────────────
+     Pinned as a column when there is room, floating over the canvas when
+     there is not. Never simply hidden, because the breadcrumb only walks up
+     the hierarchy and the tree is the only way across it. */
+  const treebtn = document.getElementById("treebtn");
+
+  function setTree(open) {
+    app.classList.toggle("tree-open", open);
+    treebtn.classList.toggle("on", open);
+    treebtn.setAttribute("aria-expanded", String(open));
+  }
+
+  treebtn.onclick = () => setTree(!app.classList.contains("tree-open"));
+  narrow.addEventListener("change", e => setTree(!e.matches));
+  setTree(!narrow.matches);
+
+  buildScenMenu();
+  render("context");
+})();
+</script>

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "arch-explorer",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "arch-explorer", "run", "dev"],
+      "port": 4173
+    }
+  ]
+}
