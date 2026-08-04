@@ -349,7 +349,7 @@ footer b{color:var(--fg-2)}
 
   <main>
     <div class="hero">
-      <p class="eyebrow">Internal working plan <span>&middot;</span> Owner: Levente Kiss <span>&middot;</span> Devcon 8 Mumbai, 3&ndash;6 Nov 2026</p>
+      <p class="eyebrow">Working plan, 29 Jul 2026 <span>&middot;</span> Owner: Levente Kiss <span>&middot;</span> Devcon 8 Mumbai, 3&ndash;6 Nov 2026</p>
       <h1>Can we stream all of Devcon on Swarm?</h1>
       <p class="lede">Yes, on three conditions. The pipeline is not the risk, we have measured that.
       The risk is the contribution hop we do not own, running 20 parallel streams for 12 hours a day
@@ -361,6 +361,35 @@ footer b{color:var(--fg-2)}
         <div class="stat rk"><dt>Swarm strains at</dt><dd>4,000<small>direct clients, not 20,000</small></dd></div>
         <div class="stat sg"><dt>Decision due</dt><dd id="cdGate">&mdash;<small>mid-Aug go / no-go</small></dd></div>
       </dl>
+    </div>
+
+    <style>
+      .sup-note{max-width:var(--measure);margin:0 auto 3rem;padding:1.15rem 1.35rem;
+        background:var(--warn-bg);border:1px solid var(--line);
+        border-left:3px solid var(--warn);border-radius:var(--r);
+        font-size:.95em;line-height:1.55}
+      .sup-note h3{margin:0 0 .55rem;font-family:var(--f-display);font-size:.82em;
+        font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--warn)}
+      .sup-note p{margin:0 0 .7rem}
+      .sup-note p:last-child{margin-bottom:0}
+      .sup-note a{color:var(--accent)}
+    </style>
+    <div class="sup-note">
+      <h3>Superseded on components, not on reasoning</h3>
+      <p>An architecture review on 3 August 2026 changed several of the component decisions
+      below. The reasoning in this document, the Swarm capacity analysis, the failure and
+      threat models, the cost model and the go or no-go gates, is why the current design
+      looks the way it does and remains the best account of it. The components are not current.</p>
+      <p><b>What changed.</b> The publish lease is gone, because two independent publish lanes
+      make a forked feed impossible and leave nothing to arbitrate. The three shared origin
+      gateways are gone, replaced by one prefetch node per feed so that nothing shared sits
+      behind the stages. The coverage fleet is gone, replaced by four levels of 160 prefetch
+      nodes reaching all 512 neighborhoods. The rented web2 mirror is gone, replaced by a
+      standby stack we build ourselves. Pods carrying four to five stages each are gone, in
+      favour of per-stage isolation. The viewer target moved from 20,000 to a 40,000 ceiling
+      against an expected 4,000.</p>
+      <p>The current component design is in the <a href="explorer.html">architecture
+      explorer</a>.</p>
     </div>
 
     <section id="verdict">

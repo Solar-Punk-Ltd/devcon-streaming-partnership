@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Devcon 8 streaming partnership</title>
+<meta name="description" content="Can a twenty-stage conference be streamed over Swarm, and what would it take.">
+<style>
+:root{
+  --bg:#EDF0F3; --surface:#FFFFFF; --surface-2:#F6F8FA;
+  --fg:#0E1419; --fg-2:#3D4A55; --fg-3:#68757F;
+  --line:#CDD6DE; --line-2:#DDE4EA;
+  --accent:#E8730F; --signal:#12808C;
+  --warn:#B26A00; --warn-bg:#F7EBD8;
+  --f-display:"Helvetica Neue",-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",sans-serif;
+  --f-body:"Iowan Old Style","Charter","Palatino Linotype",Palatino,Georgia,serif;
+  --f-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --r:3px;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0E1419; --surface:#151E25; --surface-2:#1B262E;
+    --fg:#E8EDF1; --fg-2:#AFBCC6; --fg-3:#7C8B96;
+    --line:#2A3843; --line-2:#222E37;
+    --accent:#F5943F; --signal:#4FBDC8;
+    --warn:#E0A44A; --warn-bg:#2E2311;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#EDF0F3; --surface:#FFFFFF; --surface-2:#F6F8FA;
+  --fg:#0E1419; --fg-2:#3D4A55; --fg-3:#68757F;
+  --line:#CDD6DE; --line-2:#DDE4EA;
+  --accent:#E8730F; --signal:#12808C; --warn:#B26A00; --warn-bg:#F7EBD8;
+}
+:root[data-theme="dark"]{
+  --bg:#0E1419; --surface:#151E25; --surface-2:#1B262E;
+  --fg:#E8EDF1; --fg-2:#AFBCC6; --fg-3:#7C8B96;
+  --line:#2A3843; --line-2:#222E37;
+  --accent:#F5943F; --signal:#4FBDC8; --warn:#E0A44A; --warn-bg:#2E2311;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);
+  font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.wrap{max-width:60rem;margin:0 auto;padding:4.5rem 1.5rem 5rem}
+a{color:var(--accent)}
+a:focus-visible,.card:focus-visible{outline:2px solid var(--signal);outline-offset:3px}
+
+.eyebrow{font-family:var(--f-display);font-size:.75rem;font-weight:600;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--fg-3);margin:0 0 .9rem}
+h1{font-family:var(--f-display);font-size:clamp(2rem,5vw,2.9rem);line-height:1.1;
+  letter-spacing:-.02em;margin:0 0 1rem;text-wrap:balance}
+.lede{font-size:1.16rem;color:var(--fg-2);max-width:44ch;margin:0 0 2.6rem}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:var(--r);
+  margin:0 0 3.5rem;overflow:hidden}
+.stat{background:var(--surface);padding:1rem 1.15rem}
+.stat dt{font-family:var(--f-display);font-size:.7rem;font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--fg-3);margin:0 0 .3rem}
+.stat dd{margin:0;font-family:var(--f-mono);font-size:1.45rem;font-variant-numeric:tabular-nums;
+  letter-spacing:-.02em}
+.stat small{display:block;font-family:var(--f-body);font-size:.8rem;color:var(--fg-3);
+  letter-spacing:0;margin-top:.15rem}
+
+h2{font-family:var(--f-display);font-size:.78rem;font-weight:600;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--fg-3);margin:0 0 1.1rem}
+.cards{display:grid;gap:1rem;margin:0 0 3rem}
+@media (min-width:44rem){.cards{grid-template-columns:1fr 1fr}}
+.card{display:block;background:var(--surface);border:1px solid var(--line);
+  border-left:3px solid var(--line-2);border-radius:var(--r);padding:1.3rem 1.4rem;
+  text-decoration:none;color:inherit;transition:border-color .15s,transform .15s}
+.card:hover{border-left-color:var(--accent);transform:translateY(-1px)}
+.card.live{border-left-color:var(--signal)}
+.card h3{font-family:var(--f-display);font-size:1.06rem;margin:0 0 .35rem;color:var(--fg)}
+.card p{margin:0;font-size:.95rem;color:var(--fg-2);line-height:1.5}
+.tag{display:inline-block;font-family:var(--f-display);font-size:.66rem;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;padding:.13rem .45rem;border-radius:2px;
+  margin-left:.5rem;vertical-align:.14em}
+.tag.now{background:var(--signal);color:var(--bg)}
+.tag.old{background:var(--warn-bg);color:var(--warn)}
+
+.note{background:var(--surface-2);border:1px solid var(--line-2);border-radius:var(--r);
+  padding:1.1rem 1.3rem;font-size:.95rem;color:var(--fg-2);margin:0 0 2.5rem}
+.note b{color:var(--fg)}
+footer{border-top:1px solid var(--line);padding-top:1.4rem;font-size:.88rem;color:var(--fg-3)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Solar Punk &middot; Ethereum Foundation</p>
+  <h1>Devcon 8 streaming partnership</h1>
+  <p class="lede">Can a twenty-stage conference be streamed over Swarm, and what would
+  it actually take.</p>
+
+  <dl class="stats">
+    <div class="stat"><dt>Stages</dt><dd>20<small>12 h a day, 4 days</small></dd></div>
+    <div class="stat"><dt>Feeds</dt><dd>160<small>4 rungs, 2 lanes</small></dd></div>
+    <div class="stat"><dt>Viewer ceiling</dt><dd>40k<small>4,000 expected</small></dd></div>
+    <div class="stat"><dt>Blast radius</dt><dd>1<small>stage of twenty</small></dd></div>
+  </dl>
+
+  <h2>Read</h2>
+  <div class="cards">
+    <a class="card live" href="explorer.html">
+      <h3>Architecture explorer<span class="tag now">Current</span></h3>
+      <p>An expandable map of the architecture as it now stands, with the count and blast
+      radius of every component, and a guided walkthrough.</p>
+    </a>
+    <a class="card" href="architecture-plan.html">
+      <h3>Architecture plan<span class="tag old">29 Jul</span></h3>
+      <p>The full reasoning: Swarm capacity analysis, failure and threat models, the cost
+      model, and the go or no-go gates. Superseded on components, not on reasoning.</p>
+    </a>
+    <a class="card" href="https://github.com/Solar-Punk-Ltd/devcon-streaming-partnership/blob/main/docs/handover.md">
+      <h3>Partnership brief</h3>
+      <p>What we propose to provide, where the handoff sits, and what we would need from
+      the Devcon team.</p>
+    </a>
+    <a class="card" href="https://github.com/Solar-Punk-Ltd/devcon-streaming-partnership/blob/main/docs/questionnaire.md">
+      <h3>Questionnaire</h3>
+      <p>Priority-tagged questions across scope, feed spec, venue, scale, player, archive,
+      operations and commercial terms.</p>
+    </a>
+  </div>
+
+  <h2>Where the design stands</h2>
+  <div class="note">
+    <p style="margin:0 0 .7rem"><b>Swarm is the origin, the storage and the archive.</b>
+    Every stage is published twice, on two lanes sharing no signing key, no feed and no
+    postage batch, so a forked feed is impossible by construction rather than policed.</p>
+    <p style="margin:0"><b>A cache sits in front of nodes we run</b>, because
+    content-addressed segments are immutably cacheable and that is what makes a conference
+    audience affordable. Anyone who prefers can fetch the identical hash-verified bytes
+    from the network directly.</p>
+  </div>
+
+  <footer>
+    Working documents, not a finished proposal &middot;
+    <a href="https://github.com/Solar-Punk-Ltd/devcon-streaming-partnership">Source on GitHub</a>
+  </footer>
+</div>
+</body>
+</html>
