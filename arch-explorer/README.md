@@ -1,7 +1,8 @@
 # Devcon 8 architecture explorer
 
-An interactive explorer for the Devcon 8 streaming architecture. Three views over
-one model, eight playable scenarios, and the numbers behind every decision.
+An interactive explorer for the Devcon 8 streaming architecture. One expandable
+canvas over one model, a guided walkthrough, and the count and blast radius of
+every component.
 
 Built after a close read of [IcePanel](https://icepanel.io), which is the best
 thing in this category. What it gets right, and what is borrowed here, is
