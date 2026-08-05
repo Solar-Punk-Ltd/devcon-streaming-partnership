@@ -24,6 +24,12 @@
 > 40,000 ceiling against an expected 4,000.
 >
 > The current component design is in [`../arch-explorer/`](../arch-explorer/).
+>
+> **Which sections are stale:** [6.2](#62-pushback-on-two-servers-per-stage) pods,
+> [7.5](#75-how-many-nodes-do-we-need-and-where) fleet sizing,
+> [8.4](#84-the-degradation-ladder) and [8.5](#85-web2-mirror-choice) the YouTube mirror,
+> and the two fleet rows in [13.2](#132-everything-else). Each one says at its end what
+> replaced it. Everything else, including every number, is current.
 
 ---
 
@@ -397,6 +403,12 @@ The blast-radius argument for per-stage is real but it is answered by the standb
 
 Middle ground if you want smaller blast radius: pods of 3, so 7 pods at 20 stages, 14 VMs. Still an order of magnitude fewer chequebooks than 40.
 
+**What we decided instead, and why this argument lost.** The review went the other way: **one worker per stage, plus two standing spares, so 22 machines.** Per-stage isolation won, and the pod argument above is kept because its reasoning is still the reason the decision was hard.
+
+The chequebook objection is what changed, not the blast-radius maths. The design now runs **one funded publisher node per rung per lane, which is 160 chequebooks**, four times the 40 this section rejected as unmanageable. That is affordable only because the stamp manager automates funding and expiry as a lifecycle rather than a chore, so the cost of a chequebook stopped being human attention. Once that held, the objection to per-stage isolation stopped being decisive, and 160 nodes buys something pods cannot: a full batch or a drained chequebook costs **one rung of one lane** instead of a whole pod.
+
+Note also that the second lane, not a hot twin, is what carries a stage through failure. That is [6.3](#63-redundancy-concretely).
+
 ### 6.3 Redundancy, concretely
 
 The hard part of standby publishing to Swarm is that **two uploaders publishing the same feed would fight over the feed index**, and a split-brain on a signed feed is worse than an outage because it corrupts the archive. There are two ways to stop that. One is to arbitrate who may sign. The other is to make sure there is only ever one place a writer could run from. **We do the second, because it needs no coordination at all.**
@@ -586,6 +598,10 @@ flowchart TB
 
 **Warning on where to host this.** See [section 13.5](#135-where-each-workload-should-actually-run). Do not put a bandwidth-heavy Swarm fleet on Azure. Hetzner EU at 20 TB included per instance is close to free for coverage nodes, with a few India-local nodes for the WSS entry role.
 
+**What the fleet actually is now.** The tiering above was replaced by two roles and a much larger count: **160 publisher nodes**, one per rung per stage per lane, and **640 prefetch nodes**, one per feed repeated at four distances so that every one of the 512 neighborhoods at depth 9 holds a node of ours. The shared gateway tier is gone entirely, because a CDN in front of the level-0 prefetch nodes does that job without any component sitting behind all the stages. Probes stay at four.
+
+Covering depth 9 rather than the depth 8 this section argues for is deliberate: 512 sections cover the 256 anyway, and the thin neighborhoods at depth 9 are exactly where our own node is worth the most. The 800-node fleet is also why the cost rows in [13.2](#132-everything-else) are still a placeholder.
+
 ### 7.6 How we know when to add nodes
 
 | Signal | Source | Green | Escalate at | Action |
@@ -731,6 +747,8 @@ stateDiagram-v2
 
 **Tier 3, Livepeer, is optional and I lean toward including it.** It gives a rung that is still decentralized before falling all the way to YouTube, which matches EF's "gradual is fine" stance better than a binary Swarm-or-YouTube switch. Devcon 6 was streamed on a decentralized transcoding network with a Swarm and IPFS archive, so there is precedent EF knows. Livepeer states it handles 1,000 concurrent streams at sub-3-second latency, and we have a `hackdays-livepeer` repo so there is prior familiarity. The reason to skip it is scope: a second integration to build and test in 14 weeks. **My call: define the rung in the design, build it only if ABR-over-Swarm lands early.**
 
+**What the ladder is now.** Two rungs, not four. The player switches quality off the master playlist and, if Swarm delivery fails, fails over to **our own standby stack** listed as a redundant stream. Livepeer is not in the design and YouTube is not the floor. The reason is that a rung nobody has built and tested is not a rung, and each one added here was another integration competing for the same weeks.
+
 ### 8.5 Web2 mirror choice
 
 | Platform | Egress cost | Concurrency ceiling | Mobile | Long-session | Verdict |
@@ -748,6 +766,8 @@ stateDiagram-v2
 - **Verify the cap against the actual channels we will use, well before the event.** Uneven enforcement means we cannot assume our channel behaves like the documentation, in either direction.
 - If EF publishes on Devcon's own channel, the cap applies to *their* channel and becomes their constraint to solve. Another reason to settle Decision 3 early.
 - Twenty simultaneous RTMP outputs is also 20 extra encoder sessions on the media engines. Small per stream, but it is real CPU that belongs in the 150 vCPU sizing rather than discovered later.
+
+**We build the mirror instead of renting it.** The whole of this section is moot: the standby path is now **our own segments in ordinary object storage behind a second CDN**, dormant until the signed config points at it. No YouTube, so no channel cap, no 20 extra RTMP sessions, and no platform deciding how our fallback behaves. It shares nothing with the Swarm path except the packager output, which is the property a fallback actually needs.
 
 ---
 

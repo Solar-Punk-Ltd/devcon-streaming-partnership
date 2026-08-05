@@ -390,6 +390,10 @@ footer b{color:var(--fg-2)}
       against an expected 4,000.</p>
       <p>The current component design is in the <a href="./">architecture
       explorer</a>.</p>
+      <p><b>Which sections are stale.</b> Layer 1's pod argument, the node-fleet sizing, the
+      degradation ladder and the YouTube mirror, and the two fleet rows inside the cost model.
+      Each one says at its end what replaced it. Everything else, including every number, is
+      current.</p>
     </div>
 
     <section id="verdict">
@@ -583,8 +587,9 @@ footer b{color:var(--fg-2)}
     </section>
 
     <section id="ingest">
-      <div class="sec-h"><span class="sec-n">06</span><h2>Layer 1: pods, not 40 servers</h2></div>
-      <p class="sec-sub">I agree with the redundancy goal and disagree with the unit.</p>
+      <div class="sec-h"><span class="sec-n">06</span><h2>Layer 1: one worker per stage</h2></div>
+      <p class="sec-sub">The pod argument is kept because its reasoning is why the decision was hard.
+      The review went the other way.</p>
 
       <div class="co" data-pv="measured">
         <p class="co-t">The pushback <span class="pv pv-measured">Grounded in pac-bench</span></p>
@@ -613,6 +618,19 @@ footer b{color:var(--fg-2)}
       <strong>hot</strong>. If failover works, blast radius is a 2 to 4 second discontinuity. If it
       does not work, per-stage isolation only means losing one stage instead of five, and you have
       already failed. <strong>So spend the effort making failover work rather than subdividing it.</strong></p>
+
+      <div class="co">
+        <p class="co-t">What we decided instead, and why this argument lost</p>
+        <p>The review went the other way: <strong>one worker per stage, plus two standing spares, so
+        22 machines.</strong> The chequebook objection is what changed, not the blast-radius maths. The
+        design now runs one funded publisher node per rung per lane, which is <strong>160
+        chequebooks</strong>, four times the 40 rejected above as unmanageable.</p>
+        <p>That is affordable only because the stamp manager automates funding and expiry as a
+        lifecycle rather than a chore, so a chequebook stopped costing human attention. Once that held,
+        the objection stopped being decisive, and 160 nodes buys something pods cannot: a full batch or
+        a drained chequebook costs <strong>one rung of one lane</strong> instead of a whole pod. Note
+        also that the second lane, not a hot twin, is what carries a stage through failure.</p>
+      </div>
 
       <details><summary>Redundancy, concretely, and the split-brain trap</summary><div class="dt">
         <p>The hard part is that <strong>two uploaders publishing the same feed would fight over the
@@ -760,6 +778,19 @@ footer b{color:var(--fg-2)}
           <tr><td class="k">Probe</td><td class="n">4 to 6</td><td>light</td><td>Mumbai, Frankfurt, Virginia, Singapore</td><td>Tell us the truth about retrieval</td></tr>
         </tbody>
       </table></div>
+
+      <div class="co">
+        <p class="co-t">What the fleet actually is now</p>
+        <p>The tiering above was replaced by two roles and a much larger count: <strong>160 publisher
+        nodes</strong>, one per rung per stage per lane, and <strong>640 prefetch nodes</strong>, one
+        per feed repeated at four distances so every one of the 512 neighborhoods at depth 9 holds a
+        node of ours. The shared gateway tier is gone entirely, because a CDN in front of the level-0
+        prefetch nodes does that job without any component sitting behind all the stages. Probes stay
+        at four.</p>
+        <p>Covering depth 9 rather than the depth 8 argued for above is deliberate: 512 sections cover
+        the 256 anyway, and the thin neighborhoods at depth 9 are exactly where our own node is worth
+        the most. This 800-node fleet is also why the cost model still carries a placeholder.</p>
+      </div>
 
       <div class="co wn">
         <p class="co-t">Be honest about what full coverage is</p>
@@ -922,6 +953,17 @@ footer b{color:var(--fg-2)}
         <strong>verify the cap against the actual channels well before the event</strong>, because
         uneven enforcement means we cannot assume our channel matches the documentation in either
         direction. If EF publishes on Devcon's channel, the cap becomes their constraint.</p>
+      </div>
+
+      <div class="co">
+        <p class="co-t">We build the mirror instead of renting it</p>
+        <p>All of the above is moot. The standby path is now <strong>our own segments in ordinary
+        object storage behind a second CDN</strong>, dormant until the signed config points at it. No
+        YouTube, so no channel cap, no 20 extra RTMP sessions, and no platform deciding how our
+        fallback behaves. It shares nothing with the Swarm path except the packager output, which is
+        the property a fallback actually needs.</p>
+        <p>The ladder shortened with it: <strong>two rungs, not four.</strong> Livepeer is not in the
+        design and YouTube is not the floor, because a rung nobody has built and tested is not a rung.</p>
       </div>
     </section>
 
