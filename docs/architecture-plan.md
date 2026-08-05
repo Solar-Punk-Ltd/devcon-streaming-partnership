@@ -407,7 +407,7 @@ Middle ground if you want smaller blast radius: pods of 3, so 7 pods at 20 stage
 
 The chequebook objection is what changed, not the blast-radius maths. The design now runs **one funded publisher node per rung per lane, which is 160 chequebooks**, four times the 40 this section rejected as unmanageable. That is affordable only because the stamp manager automates funding and expiry as a lifecycle rather than a chore, so the cost of a chequebook stopped being human attention. Once that held, the objection to per-stage isolation stopped being decisive, and 160 nodes buys something pods cannot: a full batch or a drained chequebook costs **one rung of one lane** instead of a whole pod.
 
-Note also that the second lane, not a hot twin, is what carries a stage through failure. That is [6.3](#63-redundancy-concretely).
+Note also that the second lane, not a hot twin, is what carries a stage through failure (see §6.3 below).
 
 ### 6.3 Redundancy, concretely
 
@@ -747,7 +747,7 @@ stateDiagram-v2
 
 **Tier 3, Livepeer, is optional and I lean toward including it.** It gives a rung that is still decentralized before falling all the way to YouTube, which matches EF's "gradual is fine" stance better than a binary Swarm-or-YouTube switch. Devcon 6 was streamed on a decentralized transcoding network with a Swarm and IPFS archive, so there is precedent EF knows. Livepeer states it handles 1,000 concurrent streams at sub-3-second latency, and we have a `hackdays-livepeer` repo so there is prior familiarity. The reason to skip it is scope: a second integration to build and test in 14 weeks. **My call: define the rung in the design, build it only if ABR-over-Swarm lands early.**
 
-**What the ladder is now.** Two rungs, not four. The player switches quality off the master playlist and, if Swarm delivery fails, fails over to **our own standby stack** listed as a redundant stream. Livepeer is not in the design and YouTube is not the floor. The reason is that a rung nobody has built and tested is not a rung, and each one added here was another integration competing for the same weeks.
+**What the degradation ladder is now.** The *fallback tiers* are two, not four: Swarm delivery (default) and **our own standby stack** (object storage behind a second CDN). This is separate from the 4‑rendition ABR ladder in §2.3 (1080/720/480/360), which is what drives the write-side and archive volume numbers above.
 
 ### 8.5 Web2 mirror choice
 
