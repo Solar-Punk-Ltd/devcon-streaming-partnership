@@ -41,26 +41,28 @@ The conditions are not "more engineering". They are three things that make the d
 
 ```mermaid
 pie showData title All-Azure cost share, 20 stages at 10k peak concurrent
-    "Viewer egress" : 17899
-    "Compute, event + rehearsal, HA" : 2477
-    "Swarm postage, 1 year archive" : 2175
+    "Viewer egress" : 17896
+    "Compute, event + rehearsal" : 977
+    "Swarm postage, 1 year, two lanes" : 8120
     "Node fleet + control plane" : 2600
 ```
 
-**And the single largest lever is not engineering, it is where we buy bandwidth.** Because a Swarm segment's address is its content hash, segments are immutably cacheable, which gives a CDN a near-perfect hit rate and collapses the origin fleet to a handful of VMs. That turns the same 20k-peak event from **$35,008 of Azure egress into about $2,416**, a 93% saving, for **under one engineer-week of extra setup**. Full comparison of seven providers and four deployment variants in [13.3](#133-provider-comparison-the-same-egress-priced-seven-ways) and [13.4](#134-four-deployment-variants-priced-and-scored).
+**And the single largest lever is not engineering, it is where we buy bandwidth.** Because a Swarm segment's address is its content hash, segments are immutably cacheable, which gives a CDN a near-perfect hit rate and collapses the origin fleet to a handful of VMs. That turns the same 20k-peak event from **$35,006 of Azure egress into about $2,451**, a 93% saving, for **under one engineer-week of extra setup**. Full comparison of seven providers and four deployment variants in [13.3](#133-provider-comparison-the-same-egress-priced-seven-ways) and [13.4](#134-four-deployment-variants-priced-and-scored).
+
+**The CDN has to be a third party, and that is a finding rather than a preference.** Azure Front Door egress in India is $0.109/GB to 10 TB and $0.085/GB from 10 to 50 TB, against $0.12 then $0.085 for raw Azure VM egress. They cost the same, so fronting Azure with Azure's own CDN saves nothing. The 93% comes from bunny.net Volume at $0.005/GB. Front Door above 150 TB is quoted "contact sales", so the 40,000 ceiling cannot be priced from published Azure rates at all.
 
 Costed at **20 stages**, the planning number for this document:
 
-| Variant | 20 stages, 10k peak, all-in | 20k peak | Extra effort |
-|---|---|---|---|
-| A: all Azure | $26,746 | $43,853 | baseline |
-| B: Azure ingest + Vultr Mumbai gateways | $10,745 | $12,884 | +1.5 to 2.5 weeks |
-| C: cheapest multi-provider | ~$10,000 | ~$11,500 | +3 to 4 weeks, **not worth it** |
-| **D: CDN-fronted, recommended** | **$10,194** | **$11,263** | **+0.5 to 1 week** |
+| Variant | 10k peak, all-in | 20k peak | **40k peak, the ceiling** | Extra effort |
+|---|---|---|---|---|
+| A: all Azure | $29,596 | $46,703 | **$80,918** | baseline |
+| B: Azure ingest + Vultr Mumbai gateways | $13,595 | $15,734 | $20,011 | +1.5 to 2.5 weeks |
+| C: cheapest multi-provider | ~$13,100 | ~$14,450 | ~$17,200 | +3 to 4 weeks, **not worth it** |
+| **D: CDN-fronted, recommended** | **$13,078** | **$14,148** | **$16,286** | **+0.5 to 1 week** |
 
-**The decisive argument is not the event bill, it is load testing.** Three 6-hour runs at 20k peak is 160.4 TB, which costs **$13,622 on Azure against $802 on a CDN**. Load testing alone costs more on Azure than the whole event does under Variant D. Under A we would ration tests to protect the budget, and rationing tests is exactly how we reach Gate 2 in October without the evidence to say yes.
+**The decisive argument is not the event bill, it is load testing.** Three 6-hour runs held at 20k peak is 356.4 TB, which costs **$29,304 on Azure against $1,782 on a CDN**. At the 40k ceiling it is $57,816 against $3,564. Load testing alone costs three to four times more on Azure than the whole event does under Variant D. Under A we would ration tests to protect the budget, and rationing tests is exactly how we reach Gate 2 in October without the evidence to say yes.
 
-**Funding: we have no credits today.** The highest-probability path is EF covering delivery infrastructure as an event line item, then Swarm Foundation co-funding the R and D half. Microsoft for Startups self-service is up to $5,000 with no investor needed and is worth filing this week. Full options with sources in [13.11](#1311-funding-and-sponsorship-options). **The strategic point: fix the architecture first so the ask is $11k rather than $44k.**
+**Funding: we have no credits today.** The highest-probability path is EF covering delivery infrastructure as an event line item, then Swarm Foundation co-funding the R and D half. Microsoft for Startups self-service is up to $5,000 with no investor needed and is worth filing this week. Full options with sources in [13.11](#1311-funding-and-sponsorship-options). **The strategic point: fix the architecture first so the ask at the ceiling is $16k rather than $81k.**
 
 **What is genuinely new risk.** Not the pipeline. We have measured the pipeline. The risk is (a) the contribution hop we do not own, (b) operating 5 to 20 parallel streams for 12 hours a day when everything we have proven is single-stream, and (c) putting load on a volunteer network with no rollback.
 
@@ -131,7 +133,7 @@ flowchart TB
 
 **Decision 1: we are planning at 20 stages.** Devcon 7 had 6 main stages plus roughly 70 spaces, and the meeting notes say 5 to 10 concurrent streams, so 20 is the conservative end of our exposure rather than the expected case. **Everything in this document is costed and sized at 20**, on the principle that it is far easier to scale a 20-stage plan down than to discover in October that 8 was optimistic. We should still get a room list from EF before signing, because 20 stages changes crew, badges, recording boxes and rehearsal time even though it does not move the egress bill.
 
-At 20 stages the concrete build parameters are: **4 pods of 5 stages (8 VMs) or 7 pods of 3 (14 VMs)**, 140 vCPU of transcode across 9 D16as_v5, 20 SRT feeds, 20 local recording boxes, and **2 YouTube channels** for the mirror, per the channel cap noted in [8.5](#85-web2-mirror-choice).
+At 20 stages the concrete build parameters are: **4 pods of 5 stages (8 VMs) or 7 pods of 3 (14 VMs)**, **about 150 vCPU** of transcode, 20 SRT feeds, 20 local recording boxes, and **2 YouTube channels** for the mirror, per the channel cap noted in [8.5](#85-web2-mirror-choice).
 
 **Decision 3 changes the risk profile more than any technical choice.** If we are the only stream on devcon.org, a Swarm-path failure is an event incident with EF's name on it. If we are the decentralized stream alongside an EF-operated one, the same failure is a footnote. The answer also determines whether our web2 mirror is *ours* to build or is simply EF's existing stream.
 
@@ -139,7 +141,11 @@ At 20 stages the concrete build parameters are: **4 pods of 5 stages (8 VMs) or 
 
 ### 2.3 Assumptions I am using until told otherwise
 
-- Delivery rendition 1080p30 at 3 Mbps, 2 second segments. Ladder adds 720p at 1.5 Mbps and 480p at 0.7 Mbps.
+- Delivery rendition 1080p30 at 3 Mbps, 2 second segments. Ladder adds 720p at 1.5 Mbps,
+  480p at 0.7 Mbps and 360p at 0.4 Mbps, so **four rungs summing to 5.6 Mbps per stage**.
+- Every stage is published **twice, on two independent lanes**. Both lanes carry identical
+  bytes, so they land on identical chunk addresses and the network stores one copy, but we
+  pay egress and postage twice.
 - Average delivered bitrate across a mobile-heavy audience: **2.2 Mbps**.
 - Average concurrent viewers over a 12 hour day: **45% of peak**.
 - Contribution feed arrives as one produced program feed per stage at 5 to 10 Mbps.
@@ -391,22 +397,23 @@ The blast-radius argument for per-stage is real but it is answered by the standb
 
 Middle ground if you want smaller blast radius: pods of 3, so 7 pods at 20 stages, 14 VMs. Still an order of magnitude fewer chequebooks than 40.
 
-### 6.3 Hot standby, concretely
+### 6.3 Redundancy, concretely
 
-The hard part of a hot standby publishing to Swarm is that **two uploaders publishing the same feed would fight over the feed index.** So:
+The hard part of standby publishing to Swarm is that **two uploaders publishing the same feed would fight over the feed index**, and a split-brain on a signed feed is worse than an outage because it corrupts the archive. There are two ways to stop that. One is to arbitrate who may sign. The other is to make sure there is only ever one place a writer could run from. **We do the second, because it needs no coordination at all.**
 
-- Both pods ingest and transcode continuously. Both are always warm.
-- Only the active pod holds a **publish lease** and signs feed updates. The standby transcodes into the void.
-- The lease is a short TTL record the control plane arbitrates. Lose the lease, stop signing, immediately.
-- On failover the standby picks up the feed at the next index and arms a discontinuity marker. Our e2e scenario B already proves the player handles a discontinuity plus clean resume.
-- **Never let both sign.** A split-brain on a signed feed is worse than an outage because it corrupts the archive.
+- **Two independent lanes, not one lane with a standby.** Every stage publishes twice, to two sets of feeds sharing no signing key, no feed and no postage batch. A fork between them is impossible by construction rather than policed, and there is nothing left for a lease to arbitrate.
+- **One writer per feed, pinned to one host.** The supervisor guarantees one process on that host, so there is no second place a writer could run from and no distributed lock to get wrong. A frozen process stalls that stage's lane, the supervisor kills and restarts exactly one, and the other lane carries the stage meanwhile.
+- **Standing spares rather than hot twins.** A transcode worker is stateless, so a spare has nothing to move across and can come up from a clean image. Twenty workers plus two idle spares is 22 machines against 40 for one-to-one pairing, and it buys about 30 seconds of black instead of none. Paying twice for compute to avoid those 30 seconds is not a trade worth making.
+- **A discontinuity is a supported state, not a failure.** When a spare takes over it picks the feed up at the next index and arms a discontinuity marker. Our e2e scenario B already proves the player handles a discontinuity plus clean resume.
+
+The cost consequence is in [6.4](#64-transcode-sizing): because no standby transcodes in parallel, transcode compute is sized once rather than doubled.
 
 ### 6.4 Transcode sizing
 
-| Stages | CPU path, x264 veryfast, 3 rungs | GPU path, NVENC |
+| Stages | CPU path, x264 veryfast, 4 rungs | GPU path, NVENC |
 |---|---|---|
-| 8 | 56 vCPU, 4x D16as_v5 | 2x A10 |
-| 20 | 140 vCPU, 9x D16as_v5 | 3x A10 |
+| 8 | 60 vCPU, 4x D16as_v5 | 2x A10 |
+| 20 | **150 vCPU, 10x D16as_v5** | 3x A10 |
 
 CPU is the simpler operational story and the cost difference is small at these volumes. **Start on CPU.** Revisit GPU only if we end up at 20 stages with a full ladder.
 
@@ -457,9 +464,9 @@ Conflating these is the most common mistake in this analysis.
 ```mermaid
 flowchart TB
     subgraph WRITE["WRITE · scales with STAGES · trivial"]
-        W1["20 stages x 3 Mbps = 60 Mbps unique"]
-        W2["+7.5% MEDIUM parity = 65 Mbps pushsync"]
-        W3["7 new chunks/s per neighborhood"]
+        W1["20 stages x 5.6 Mbps ladder = 112 Mbps unique"]
+        W2["+7.5% MEDIUM parity = 120 Mbps<br/>x 2 lanes = 241 Mbps pushsync"]
+        W3["7 new chunks/s per neighborhood<br/>at depth 9"]
         W1 --> W2 --> W3
     end
     subgraph READ["READ BANDWIDTH · scales with VIEWERS · the classic problem"]
@@ -479,7 +486,7 @@ flowchart TB
     style CONN fill:#fff4e6,stroke:#e8730f,color:#1a1a1a
 ```
 
-**The write side is a non-event.** Twenty stages of full-ladder publishing is about 65 Mbps of pushsync and roughly 7 new chunks per second per neighborhood. The network will not notice us uploading Devcon.
+**The write side is a non-event.** Twenty stages of full-ladder publishing on two lanes is about 241 Mbps of pushsync and roughly 7 new chunks per second per neighborhood at depth 9. The network will not notice us uploading Devcon.
 
 ### 7.3 Where read bandwidth breaks: the direct-client number
 
@@ -740,7 +747,7 @@ stateDiagram-v2
 - Plan for 2 to 3 channels and assign stages to them deterministically, so the run-of-show board knows where each stage is mirrored.
 - **Verify the cap against the actual channels we will use, well before the event.** Uneven enforcement means we cannot assume our channel behaves like the documentation, in either direction.
 - If EF publishes on Devcon's own channel, the cap applies to *their* channel and becomes their constraint to solve. Another reason to settle Decision 3 early.
-- Twenty simultaneous RTMP outputs is also 20 extra encoder sessions on the media engines. Small per stream, but it is real CPU that belongs in the 140 vCPU sizing rather than discovered later.
+- Twenty simultaneous RTMP outputs is also 20 extra encoder sessions on the media engines. Small per stream, but it is real CPU that belongs in the 150 vCPU sizing rather than discovered later.
 
 ---
 
@@ -889,10 +896,10 @@ flowchart TB
     F1 --> M1["Dual encoder or dual SRT out.<br/>OPEN: needs EF answer"]
     F2 --> M2["Bonded cellular second path<br/>+ local recording for the archive"]
     F3 --> M3["EF and vendor own this.<br/>Name it in the contract"]
-    F4 --> M4["Hot standby pod, publish lease"]
+    F4 --> M4["Standing spare takes the stage,<br/>and lane B never stopped"]
     F5 --> M5["Engine restart re-announce.<br/>PROVEN, e2e scenario E"]
     F6 --> M6["Resume from saved state,<br/>not VOD-finalise.<br/>PROVEN, e2e scenario F"]
-    F7 --> M7["Single-writer lease.<br/>Never let both sign"]
+    F7 --> M7["One writer pinned to one host.<br/>No second place it could run"]
     F8 --> M8["Preflight gate + continuous<br/>auto top-up + page"]
     F9 --> M9["stamp-monitor + postage-batcher,<br/>dilute at 85% utilisation"]
     F10 --> M10["Warm fleet, more gateway nodes,<br/>demote a tier"]
@@ -999,9 +1006,10 @@ Modelled over 48 live hours, average concurrency at 45% of peak, average deliver
 
 | Peak concurrent | Avg concurrent | Aggregate | Egress | **Azure cost** | Effective $/GB |
 |---|---|---|---|---|---|
-| 4,000 | 1,800 | 4.0 Gbps | 85.5 TB | **$7,506** | $0.088 |
+| 4,000, EF's expected peak | 1,800 | 4.0 Gbps | 85.5 TB | **$7,506** | $0.088 |
 | 10,000 | 4,500 | 9.9 Gbps | 213.8 TB | **$17,899** | $0.084 |
 | 20,000 | 9,000 | 19.8 Gbps | 427.7 TB | **$35,006** | $0.082 |
+| **40,000, the design ceiling** | 18,000 | 39.6 Gbps | **855.4 TB** | **$69,221** | $0.081 |
 
 **Egress does not depend on stage count.** It depends on how many people watch. Worth internalising, because it decouples the two big unknowns: stage count drives our build effort, concurrency drives our bill.
 
@@ -1011,31 +1019,32 @@ Note also that **every viewer we move to the direct tier is egress we do not pay
 
 | Line | 8 stages | 20 stages | Note |
 |---|---|---|---|
-| Transcode compute, event live window only | $132 | $297 | 4 or 9 D16as_v5 for 48 h |
-| Same, with hot standby | $264 | $594 | doubled |
-| Compute, event + rehearsal, 200 h, HA | $1,101 | $2,477 | **use this line** |
-| Compute, full month soak, 720 h, HA | $3,963 | $8,916 | if we soak-test for a month |
-| Swarm postage, single rendition, 1 yr archive | $870 | $2,175 | 557 GB / 1,393 GB stored |
-| Swarm postage, 3-rung ladder, 1 yr archive | $1,508 | $3,770 | 966 GB / 2,415 GB stored |
-| Gateway VMs, 8 to 12, event + rehearsal | ~$1,400 | ~$1,400 | scales with viewers not stages |
-| Warm fleet, 32 nodes on 4 VMs, 1 month | ~$700 | ~$700 | see 13.3, host elsewhere |
+| Transcode compute, event live window only | $85 | $234 | 22 machines at 20 stages, 48 h |
+| Compute, event + rehearsal, 200 h | $355 | **$977** | **use this line** |
+| Compute, full month soak, 720 h | $1,278 | $3,517 | if we soak-test for a month |
+| Swarm postage, single rendition, one lane, 1 yr | $870 | $2,175 | 557 GB / 1,393 GB stored |
+| Swarm postage, **4-rung ladder, two lanes, 1 yr** | $3,248 | **$8,120** | 2,081 GB / 5,201 GB stamped |
+| Gateway VMs, 8 to 12, event + rehearsal | ~$1,400 | ~$1,400 | placeholder, see below |
+| Warm fleet, 32 nodes on 4 VMs, 1 month | ~$700 | ~$700 | placeholder, see below |
 | Control plane, monitoring, probes | ~$500 | ~$500 | mostly managed services |
 
-**Storage volume for the record:** 20 stages at a single 3 Mbps rendition for 48 hours is 1,296 GB raw, about 1,393 GB stored after MEDIUM erasure parity. A full 3-rung ladder is 2,415 GB stored. At roughly $1.56 per GB per year, **the permanent decentralized archive of all of Devcon 8 costs between $870 and $3,770 a year.** That is a remarkably good story and worth telling EF explicitly, since it continues the archive.devcon.org precedent at a price no one will argue with.
+**The delivery fleet is the one line in this model that is not yet real.** Those two placeholder rows total $2,100 and describe 8 to 12 shared gateways plus a 32 node warm fleet. The design is **640 prefetch nodes on about 80 machines**, which on Azure at 200 hours is roughly **$7,100 of compute before disks**, and disks are not trivial for a node doing reserve sync. Pricing it properly is a decision about where those nodes live rather than an arithmetic exercise, and [13.5](#135-where-each-workload-should-actually-run) already argues they should not live on Azure. **Treat every all-in figure in this section as a floor until that decision is made.**
+
+**Storage volume for the record:** 20 stages at a single 3 Mbps rendition for 48 hours is 1,296 GB raw, about 1,393 GB stored after MEDIUM erasure parity. A full **4-rung** ladder is 2,419 GB raw and **2,601 GB stored**, and stamping it on **two lanes** is **5,201 GB paid for**. At roughly $1.56 per GB per year, **the permanent decentralized archive of all of Devcon 8 costs between $870 and $8,120 a year.** That is still a remarkably good story and worth telling EF explicitly, since it continues the archive.devcon.org precedent at a price no one will argue with.
 
 ### 13.3 Provider comparison: the same egress, priced seven ways
 
-**Azure is between 8x and 17x more expensive than every alternative for this workload.** Same traffic, same three concurrency scenarios:
+**Azure is between 8x and 17x more expensive than every alternative for this workload.** Same traffic, same four concurrency scenarios:
 
-| Provider | Geography | 4k peak, 85.5 TB | 10k peak, 213.8 TB | 20k peak, 427.7 TB |
-|---|---|---|---|---|
-| **Azure Central India** | India | $7,503 | $17,896 | **$35,008** |
-| DigitalOcean Bangalore | India | $1,470 | $4,036 | $8,314 |
-| Vultr Mumbai | India | $615 | $1,898 | **$4,037** |
-| Hetzner Singapore | SEA | $635 | $1,661 | $3,370 |
-| Hetzner EU, Falkenstein or Helsinki | Europe | $0 | $0 | **$203** |
-| bunny.net Standard, Asia | CDN | $2,565 | $6,414 | $12,831 |
-| bunny.net Volume, global | CDN | $428 | $1,069 | **$2,138** |
+| Provider | Geography | 4k peak, 85.5 TB | 10k peak, 213.8 TB | 20k peak, 427.7 TB | **40k peak, 855.4 TB** |
+|---|---|---|---|---|---|
+| **Azure Central India** | India | $7,506 | $17,899 | **$35,006** | **$69,221** |
+| DigitalOcean Bangalore | India | $1,470 | $4,036 | $8,314 | $16,868 |
+| Vultr Mumbai | India | $615 | $1,898 | **$4,037** | $8,314 |
+| Hetzner Singapore | SEA | $635 | $1,661 | $3,370 | $6,789 |
+| Hetzner EU, Falkenstein or Helsinki | Europe | $0 | $0 | **$203** | $665 |
+| bunny.net Standard, Asia | CDN | $2,565 | $6,414 | $12,831 | $25,662 |
+| bunny.net Volume, global | CDN | $428 | $1,069 | **$2,138** | **$4,277** |
 
 Assumes 12 gateway instances so per-instance included allowances count. Rates: Azure Zone 2 tiers, Vultr $0.01/GB with 2 TB included, DigitalOcean $0.02/GB with 1 TB, Hetzner EU 1 EUR/TB with **20 TB included**, Hetzner Singapore **7.40 EUR/TB with only 0.5 TB included**, bunny Standard Asia $0.03/GB, bunny Volume $0.005/GB.
 
@@ -1066,8 +1075,10 @@ quadrantChart
 
 | | |
 |---|---|
-| **Egress, 20k peak** | $35,008 |
-| **All-in, 20 stages, 10k peak** | $26,746 |
+| **Egress, 20k peak** | $35,006 |
+| **Egress, 40k peak** | **$69,221** |
+| **All-in, 20 stages, 10k peak** | $29,596 |
+| **All-in, 20 stages, 40k peak** | **$80,918** |
 | **Extra effort vs baseline** | 0 weeks. This is the baseline. |
 | **Why you would** | One vendor, one bill, one IAM model. Mature Terraform providers, Front Door for WAF and DDoS, autoscale, Azure Monitor. India region with an enterprise SLA. Fastest path to a working system. |
 | **Why you would not** | It is the most expensive option by a factor of 8 to 17, and the money buys managed convenience we partly do not need. |
@@ -1078,7 +1089,9 @@ quadrantChart
 | | |
 |---|---|
 | **Egress, 20k peak** | $4,037, an 88% saving |
-| **All-in, 20 stages, 10k peak** | $10,745 |
+| **Egress, 40k peak** | $8,314 |
+| **All-in, 20 stages, 10k peak** | $13,595 |
+| **All-in, 20 stages, 40k peak** | $20,011 |
 | **Extra effort** | **+1.5 to 2.5 engineer-weeks** |
 | **What the effort is** | Vultr has no managed load balancer of Front Door's calibre, no equivalent WAF, weaker autoscale. So we build: our own HAProxy or nginx tier, our own scale-out scripts, our own image pipeline, monitoring agents on plain VMs, and a second secrets and networking domain. |
 | **Why this is the pragmatic pick** | Keeps India proximity, which matters for both the venue hop and Indian viewers. Vultr has Mumbai. Saves roughly $14k at 10k peak. |
@@ -1101,10 +1114,13 @@ Azure or Vultr for ingest, Hetzner EU for the Swarm warm fleet, Vultr Mumbai plu
 
 | | |
 |---|---|
-| **Egress, 20k peak** | **$2,416** with bunny Volume, or $13,109 with bunny Standard Asia |
-| **All-in, 20 stages, 10k peak** | **$10,194** |
+| **Egress, 20k peak** | **$2,451** with bunny Volume, or $13,143 with bunny Standard Asia |
+| **Egress, 40k peak** | **$4,589** with bunny Volume |
+| **All-in, 20 stages, 10k peak** | **$13,078** |
+| **All-in, 20 stages, 40k peak** | **$16,286** |
 | **Extra effort** | **+0.5 to 1 engineer-week**, the lowest of any variant |
 | **Saving vs all-Azure** | **90 to 93%** with origin shield on |
+| **Must not be Azure Front Door** | Front Door India egress matches raw Azure egress, so it saves nothing. bunny Volume, or another third-party CDN. |
 
 **This is both the cheapest realistic option and the least work, which is why it is the recommendation.** A CDN is a managed service we configure, not infrastructure we operate.
 
@@ -1113,7 +1129,7 @@ Azure or Vultr for ingest, Hetzner EU for the Swarm warm fleet, Vultr Mumbai plu
 ```mermaid
 flowchart LR
     S["Swarm<br/>origin, storage, archive"] --> O["Origin gateways<br/>2 to 4 VMs only"]
-    O -->|"2,415 GB unique content<br/>fetched once per shield"| SH["CDN origin shield<br/>tiered cache"]
+    O -->|"2,601 GB unique content<br/>fetched once per shield"| SH["CDN origin shield<br/>tiered cache"]
     SH --> P1["PoP Mumbai"]
     SH --> P2["PoP Singapore"]
     SH --> P3["PoP Frankfurt"]
@@ -1126,7 +1142,7 @@ flowchart LR
     style V fill:#e3f2fd,stroke:#1565c0,color:#1a1a1a
 ```
 
-**Origin shield is the make-or-break setting.** With tiered caching the origin serves the 2,415 GB of unique content roughly once, so origin egress costs about $278 and total lands at $2,416. Without a shield, every PoP pulls every object independently, origin egress jumps to about 48 TB, and the saving drops from 93% to 81%. At bunny Standard Asia rates without a shield the saving falls to 51%. **Verify origin shield is on and measure the origin pull volume during load testing.**
+**Origin shield is the make-or-break setting.** With tiered caching the origin serves the 2,601 GB of unique content roughly once, so origin egress costs about $312 and total lands at $2,451. Without a shield, every PoP pulls every object independently, origin egress jumps to about 52 TB, and the saving drops from 93% to 81%. At bunny Standard Asia rates without a shield the saving falls to 51%. **Verify origin shield is on and measure the origin pull volume during load testing.**
 
 **The honest architectural question: is this just a web2 CDN, which is what we said we would not do?**
 
@@ -1204,7 +1220,9 @@ flowchart TB
 - **Swarm warm fleet on Hetzner EU** for bulk neighborhood coverage, plus a few **Vultr Mumbai** nodes for India-local WSS entry.
 - **Control plane on Azure**, where cost is negligible and managed services save real time.
 
-**Expected all-in at 20 stages and 10k peak: $10,194, against $26,746 for all-Azure.** The saving is $16,552 on the event alone, plus roughly $12,800 on load testing, and it costs less than one engineer-week of extra setup.
+**Expected all-in at 20 stages and 10k peak: $13,078, against $29,596 for all-Azure. At the 40,000 ceiling: $16,286 against $80,918.** The saving is $16,518 on the event at 10k peak, rising to $64,632 at the ceiling, plus roughly $27,500 on load testing, and it costs less than one engineer-week of extra setup.
+
+**The CDN must not be Azure Front Door.** Front Door India egress is $0.109/GB to 10 TB and $0.085/GB from 10 to 50 TB, which is the same price as serving straight off Azure VMs, so it delivers the caching, WAF and DDoS absorption but none of the saving. Above 150 TB it is quoted "contact sales", which means the 40,000 ceiling cannot be priced from published rates at all. bunny Volume at $0.005/GB is where the 93% comes from.
 
 **Do not chase Variant C.** It saves another $1,000 to $2,000 over Variant B and costs 1.5 to 2 extra engineer-weeks, in a plan where engineer-weeks are the actual scarce resource and complexity is the main threat to shipping.
 
@@ -1215,29 +1233,31 @@ flowchart TB
 
 ### 13.9 All-in at 20 stages, the locked planning number
 
-Costed at **20 stages, 12 h/day, 4 days, 3-rung ladder archive**. Fixed base is **$8,847** before any egress: $2,477 compute with hot standby over 200 hours, $1,400 gateway VMs, $700 warm fleet for a month, $500 control plane, $3,770 postage for a one-year full-ladder archive.
+Costed at **20 stages, 12 h/day, 4 days, 4-rung ladder archive stamped on two lanes**. Fixed base is **$11,697** before any egress: $977 compute over 200 hours, $1,400 gateway VMs, $700 warm fleet for a month, $500 control plane, $8,120 postage for a one-year full-ladder archive on both lanes.
 
 | 20 stages | Egress volume | A: all Azure | B: Azure + Vultr | **D: CDN-fronted** |
 |---|---|---|---|---|
-| 4,000 peak | 85.5 TB | $16,353 | **$9,462** | $9,552 |
-| 10,000 peak | 213.8 TB | $26,746 | $10,745 | **$10,194** |
-| 20,000 peak | 427.7 TB | $43,853 | $12,884 | **$11,263** |
+| 4,000 peak, EF's expectation | 85.5 TB | $19,203 | **$12,312** | $12,437 |
+| 10,000 peak | 213.8 TB | $29,596 | $13,595 | **$13,078** |
+| 20,000 peak | 427.7 TB | $46,703 | $15,734 | **$14,148** |
+| **40,000 peak, the ceiling** | 855.4 TB | **$80,918** | $20,011 | **$16,286** |
 
-**An honest note on the variant ranking.** At 4,000 peak, Variant B is marginally cheaper than D, by $90, because twelve Vultr instances carry 24 TB of included traffic which covers a big share of 85.5 TB. **D only wins decisively as volume grows**, by $551 at 10k and $1,621 at 20k. So the case for D is not really the event bill, it is the load-testing argument below.
+**An honest note on the variant ranking.** At 4,000 peak, Variant B is marginally cheaper than D, by $124, because twelve Vultr instances carry 24 TB of included traffic which covers a big share of 85.5 TB. **D only wins decisively as volume grows**, by $517 at 10k, $1,586 at 20k and **$3,725 at the 40,000 ceiling**. So the case for D is not really the event bill, it is the load-testing argument below.
 
 Excludes engineering time, on-site crew and travel.
 
 ### 13.10 The load-testing argument, which is the real reason to pick D
 
-Three 6-hour load tests at 20k peak is **160.4 TB of egress**:
+Three 6-hour load tests, held at peak rather than averaged:
 
-| | Azure | CDN at $0.005/GB |
-|---|---|---|
-| 3 load-test runs, 160.4 TB | **$13,622** | **$802** |
+| | Egress | Azure | CDN at $0.005/GB |
+|---|---|---|---|
+| 3 runs at 20k peak | 356.4 TB | **$29,304** | **$1,782** |
+| 3 runs at **40k peak** | 712.8 TB | **$57,816** | **$3,564** |
 
-**Load testing alone costs more on Azure than the entire event does under Variant D.** That is the finding that should decide this. Under Variant A we would ration load tests to protect the budget, and rationing load tests is precisely how we arrive at Gate 2 in October without the evidence to say yes. Under Variant D we can run the full stress matrix repeatedly and still spend less than one Azure load test.
+**Load testing alone costs three to four times more on Azure than the entire event does under Variant D.** That is the finding that should decide this. Under Variant A we would ration load tests to protect the budget, and rationing load tests is precisely how we arrive at Gate 2 in October without the evidence to say yes. Under Variant D we can run the full stress matrix repeatedly, at the real ceiling, and still spend less than a quarter of one Azure load test.
 
-**Cheap egress does not just save money, it buys the confidence that Gate 2 requires.** Counting the load-test line, the gap between A and D at the 20k design point widens from $1,621 to roughly $14,400.
+**Cheap egress does not just save money, it buys the confidence that Gate 2 requires.** At the 20k design point the event gap between A and D is $32,555, and counting the load-test line it widens to roughly **$60,100**.
 
 ### 13.11 Funding and sponsorship options
 
@@ -1280,7 +1300,7 @@ flowchart TB
 | [Cloudflare Open Source Sponsorship](https://www.cloudflare.com/impact-portal/) | free services | Requires open source **and** operating on a non-profit basis. | Probably not, we are a Ltd doing paid work. |
 | bunny.net hop.js | free CDN | **Open-source packages only, not video delivery.** | Not applicable. Do not count on it. |
 
-**The strategic point, and I want to be blunt: do not chase a $150,000 Azure grant to pay a $35,000 Azure bill.** That is solving the wrong problem. Variant D already takes the whole event to about $11,263, which is small enough that EF covering it as a line item is unremarkable and small enough that we could absorb it if we had to. **Fix the architecture first, then ask for a much smaller number.** An $11k ask succeeds where a $44k ask invites a conversation about whether the web2 alternative is cheaper.
+**The strategic point, and I want to be blunt: do not chase a $150,000 Azure grant to pay an $81,000 Azure bill.** That is solving the wrong problem. Variant D already takes the whole event at the 40,000 ceiling to about $16,286, which is small enough that EF covering it as a line item is unremarkable and small enough that we could absorb it if we had to. **Fix the architecture first, then ask for a much smaller number.** A $16k ask succeeds where an $81k ask invites a conversation about whether the web2 alternative is cheaper.
 
 **Recommended sequence:**
 1. Ask EF who owns the delivery budget. One question, biggest lever, already in the questionnaire.
@@ -1307,7 +1327,7 @@ gantt
     section Prove the gaps
     ABR over Swarm, uploader plus player  :crit, a1, 2026-08-15, 28d
     Multi-stage orchestration, 20 parallel :a2, 2026-08-15, 21d
-    Pod hot standby and publish lease     :a3, 2026-08-22, 21d
+    Per-stage spares and lane independence :a3, 2026-08-22, 21d
     Multi-stage player and switcher UX    :a4, 2026-08-15, 35d
 
     section In-browser node track
@@ -1384,14 +1404,15 @@ EF said plainly that if we are not ready, the door is open for next year and for
 ### 15.2 For us, internal
 
 1. **Do we have Azure credits?** Ask before modelling further. If the credits are large, Variant A becomes free and the entire provider comparison is moot.
-2. **Which deployment variant?** My recommendation is D, CDN-fronted, at roughly $8,600 all-in against $25,200 for all-Azure. **Is a CDN in front of a Swarm origin acceptable to us and to the Swarm Foundation?** The argument that it is a cache rather than an origin is in [13.4](#134-four-deployment-variants-priced-and-scored), and I think it holds, but this is a positioning call as much as a technical one and Mina should weigh in.
+2. **Which deployment variant?** My recommendation is D, CDN-fronted, at **$13,078 all-in against $29,596 for all-Azure at 10k peak, or $16,286 against $80,918 at the 40,000 ceiling**. **Is a CDN in front of a Swarm origin acceptable to us and to the Swarm Foundation?** The argument that it is a cache rather than an origin is in [13.4](#134-four-deployment-variants-priced-and-scored), and I think it holds, but this is a positioning call as much as a technical one and Mina should weigh in.
 3. **Do we build ABR-over-Swarm, or ship a single rendition?** The biggest engineering call, and it directly affects the mobile-first audience EF named.
-3. **Warm fleet: 32 nodes or 256?** And are we comfortable describing a 256 node coverage fleet honestly?
-4. **How many WSS-reachable nodes exist on mainnet today?** Nobody has this number and it bounds the direct tier.
-5. **Does weeb-3 hold up on a live feed with a cold cache?** Every current number is from a well-replicated VOD.
-6. **Livepeer as tier 3, or a two-rung ladder?** Depends on whether ABR lands early.
-7. **Who is on-call, in which timezone, for 4 days?** Mumbai is UTC+5:30. Untouched so far.
-8. **What do we sign?** EF will want an uptime commitment. What number can we defend, and what is the remedy if we miss it?
+4. **Warm fleet: 32 nodes or 256?** And are we comfortable describing a 256 node coverage fleet honestly?
+5. **How many WSS-reachable nodes exist on mainnet today?** Nobody has this number and it bounds the direct tier.
+6. **Does weeb-3 hold up on a live feed with a cold cache?** Every current number is from a well-replicated VOD.
+7. **Livepeer as tier 3, or a two-rung ladder?** Depends on whether ABR lands early.
+8. **Who is on-call, in which timezone, for 4 days?** Mumbai is UTC+5:30. Untouched so far.
+9. **What do we sign?** EF will want an uptime commitment. What number can we defend, and what is the remedy if we miss it?
+10. **Where does the 640 node prefetch fleet run, and what does it cost?** The only placeholder left in the cost model, per [13.2](#132-everything-else). On Azure it is roughly $7,100 of compute before disks, and it decides whether the all-in numbers hold.
 
 ---
 
@@ -1471,8 +1492,12 @@ Live demos: [weeb-3](https://bzz.limo/bzz/c40a2cd6c8c91f79d25e7b2b12f12413604b9a
 - [Bee 2.7.0 release](https://blog.ethswarm.org/foundation/2026/bee-2-7-0-release): AutoTLS and `wss://` p2p transport, **opt-in**, foundation for browser clients and WASM tooling. Multiple underlay addresses. Erasure-coding eviction fix.
 - [Price oracle](https://docs.ethswarm.org/docs/concepts/incentives/price-oracle/): targets fourfold redundancy as a safe minimum, which is why depth 8 is the usable radius.
 - [Bee hardware and bandwidth guidance](https://blog.ethswarm.org/foundation/2023/bee-node-hardware-requirements/): roughly 10 Mbps per node in normal operation, higher for full nodes due to constant chunk syncing.
-- [Azure Zone 2 egress tiers](https://egresscost.com/azure/zones-explained/): $0.12/GB first 10 TB, $0.085 for 10 to 50 TB, $0.082 for 50 to 150 TB, $0.08 above, 100 GB free monthly, Central India in Zone 2.
-- Azure VM list pricing: D16as_v5 16 vCPU at about $0.688/h, D8as_v5 8 vCPU at about $0.344/h. Verify Central India specifics in the Azure calculator before committing.
+- [Azure Zone 2 egress tiers](https://azure.microsoft.com/en-us/pricing/details/bandwidth/): $0.12/GB first 10 TB, $0.085 for 10 to 50 TB, $0.082 for 50 to 150 TB, $0.08 above, 100 GB free monthly, Central India in Zone 2. Ingress is free.
+- Azure VM list pricing, from the [Azure retail prices API](https://prices.azure.com/api/retail/prices), Central India: `D16as_v5` Linux pay-as-you-go **$0.444/h**, Spot **$0.082/h**, one-year reservation $2,402/yr. `Dasv5` is linear at $0.02775 per vCPU-hour, so `D8as_v5` is $0.222/h and `D4as_v5` $0.111/h.
+- [Azure Front Door pricing](https://azure.microsoft.com/en-us/pricing/details/frontdoor/): Standard $35/mo base, Premium $330/mo. **India egress $0.109/GB to 10 TB, $0.085 for 10 to 50 TB, $0.083 for 50 to 150 TB, and "contact sales" above 150 TB.** Origin-inbound in India is $0.16/GB. This is the same price as raw Azure egress, so Front Door is not the CDN that produces the Variant D saving.
+- Other Azure rates, Central India: Premium SSD LRS P10 128 GB $19.71/mo, P15 256 GB $38.01, P20 512 GB $73.22, P30 1 TB $135.17. Log Analytics ingestion $3.22/GB with the first 5 GB/mo free, retention $0.14/GB/mo. Standard static public IPv4 $0.005/h.
+- [Azure Media Services is retired](https://learn.microsoft.com/en-us/previous-versions/azure/media-services/latest/azure-media-services-retirement) as of 30 June 2024, so there is no managed Azure encoder and SRS on our own compute is the only path. [Azure CDN from Edgio](https://learn.microsoft.com/en-us/previous-versions/azure/cdn/edgio-retirement-faq) retired 15 January 2025 and [Azure CDN Standard from Microsoft (classic)](https://learn.microsoft.com/en-us/azure/cdn/classic-cdn-retirement-faq) retires 30 September 2027.
+- [Azure penetration testing policy](https://learn.microsoft.com/en-us/azure/security/fundamentals/pen-testing): pre-approval has not been required since June 2017, and simulating high traffic load against your own application is explicitly encouraged. Denial-of-service simulation is a separate gated process. Azure runs automated abuse detection and, per the [Rules of Engagement](https://www.microsoft.com/en-us/msrc/pentest-rules-of-engagement), may interrupt a valid test at its discretion, so open a support case before the large runs.
 - [Solar Punk on Swarm storage cost](https://solarpunk.buzz/understanding-decentralised-data-storage-costs-on-ethereum-swarm/): about $1.561 per GB per year at time of writing. Recheck against current BZZ price.
 - Livepeer: states 1,000 concurrent streams at sub-3-second latency. Devcon 6 precedent for decentralized transcoding with a Swarm and IPFS archive.
 
@@ -1509,9 +1534,13 @@ Live demos: [weeb-3](https://bzz.limo/bzz/c40a2cd6c8c91f79d25e7b2b12f12413604b9a
 | Bee packs 8 nodes per 16-core VM | 8 | Fleet VM count scales inversely |
 | Swarm storage $1.561/GB/yr | BZZ-dependent | Postage is a rounding error either way |
 | **CDN origin shield gives a near-perfect hit rate** | assumed | **The whole Variant D saving rests on this.** Without a shield the saving drops from 93% to 81%, and at Standard Asia rates to 51%. Measure origin pull volume during load testing |
-| Unique content is 2,415 GB, 20 stages full ladder | computed | Origin egress under Variant D scales directly with this |
+| Unique content is 2,601 GB, 20 stages, 4-rung ladder | computed | Origin egress under Variant D scales directly with this |
 | Low-cost providers tolerate sustained 10 to 20 Gbps | **unverified** | **Get the traffic profile approved in writing before committing.** An abuse-review suspension mid-event would be self-inflicted and unrecoverable |
 | 12 gateway instances, so per-instance allowances count | 12 | Hetzner EU's 20 TB per instance is why that row reads $0. Fewer instances means less included traffic |
+| **Both publish lanes produce byte-identical output** | assumed | It is why two lanes cost double postage and egress but add nothing to what the network stores. If the lanes ever diverge, by a transcoder version skew or a non-deterministic encoder setting, the chunk addresses diverge with them and stored volume doubles. **Pin the encoder build and settings across lanes, and assert it in a test** |
+| Load tests hold at peak for the run | 100% of peak | The stress figures in [13.10](#1310-the-load-testing-argument-which-is-the-real-reason-to-pick-d) do not apply the 45% average, because a run that averages 45% is not testing the peak. This makes load-test volume 2.2x the equivalent event hours |
+| **Prefetch fleet cost** | **unpriced** | The base in [13.9](#139-all-in-at-20-stages-the-locked-planning-number) carries $2,100 for 8 to 12 gateways plus a 32 node warm fleet. The design is 640 prefetch nodes on about 80 machines, roughly $7,100 of Azure compute before disks. **The largest open number in this cost model** |
+| Average delivered bitrate, cross-document | 2.2 Mbps here, 3 in `arch-explorer` | Both cannot be right, and 3 Mbps is the top rung of a ladder whose bottom two rungs carry 70% of a mobile audience. Settle it in one place |
 
 ---
 
