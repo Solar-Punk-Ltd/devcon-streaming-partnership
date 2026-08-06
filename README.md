@@ -41,6 +41,7 @@ cost more than the event itself.
 | Document | Written | Status |
 |---|---|---|
 | [arch-explorer/](arch-explorer/) | current | **The live model.** An interactive map of the architecture as it now stands, with the count and blast radius of every component. Where anything below disagrees with it, this one is right. |
+| [docs/poc-deployment.md](docs/poc-deployment.md) | 2026-08-06 | **Where the POC runs and what it costs.** Vultr Mumbai for compute, bunny.net Volume for delivery, priced per scenario from live plan data. Also records why Azure is the wrong home for the delivery tier. |
 | [docs/architecture-plan.md](docs/architecture-plan.md) | 2026-07-29 | The full reasoning: Swarm capacity analysis, failure and threat models, a cost model across seven providers, and the go or no-go gates. Still the best account of **why**. Its component design has moved on, see below. |
 | [docs/architecture-plan.html](docs/architecture-plan.html) | 2026-07-29 | The same plan written for reading rather than for reference. Same caveat. |
 | [docs/handover.md](docs/handover.md) | 2026-07-22 | The partnership brief for the EF. Written under the Swarm-only decision, so its delivery claims are superseded. Everything about scope, the split of responsibility and what we need from them still holds. |

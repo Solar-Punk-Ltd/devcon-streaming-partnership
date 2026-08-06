@@ -596,7 +596,7 @@ flowchart TB
 
 **Be honest about what this is.** A full 256 node coverage fleet means we are substantially serving our own content from our own infrastructure, using Swarm as the addressing and verification layer rather than as the storage market. That is a legitimate architecture and it is how most decentralized systems bootstrap, but we should not describe it to EF as the network carrying Devcon. Start with a partial fleet of 32 and let measurement decide.
 
-**Warning on where to host this.** See [section 13.5](#135-where-each-workload-should-actually-run). Do not put a bandwidth-heavy Swarm fleet on Azure. Hetzner EU at 20 TB included per instance is close to free for coverage nodes, with a few India-local nodes for the WSS entry role.
+**Warning on where to host this.** See [section 13.5](#135-where-each-workload-should-actually-run). Do not put a bandwidth-heavy Swarm fleet on Azure. Put it on Vultr, whose bandwidth allowance pools across the account rather than per instance, and which has Indian regions the European hosts do not.
 
 **What the fleet actually is now.** The tiering above was replaced by two roles and a much larger count: **160 publisher nodes**, one per rung per stage per lane, and **640 prefetch nodes**, one per feed repeated at four distances so that every one of the 512 neighborhoods at depth 9 holds a node of ours. The shared gateway tier is gone entirely, because a CDN in front of the level-0 prefetch nodes does that job without any component sitting behind all the stages. Probes stay at four.
 
@@ -1070,9 +1070,9 @@ Assumes 12 gateway instances so per-instance included allowances count. Rates: A
 
 **Three things in that table surprised me and are worth calling out:**
 
-1. **Hetzner EU is effectively free on bandwidth.** Twelve instances at 20 TB included each is 240 TB before a single euro of overage. Even the 20k scenario costs $203. But it is in Germany or Finland, roughly 150 ms from Mumbai, which is the wrong geography for an India-weighted audience.
+1. **Hetzner EU looks close to free on bandwidth, and the figure is stale.** Twelve instances at 20 TB included each is 240 TB before a single euro of overage, and even the 20k scenario reads $203. Two 2026 price rises have moved that, roughly 37% in April and **up to 176% on the CPX and CCX lines on 15 June**, so treat the row as a benchmark rather than a quote. It is also in Germany or Finland, roughly 150 ms from Mumbai, which is the wrong geography for an India-weighted audience, and there is no India region at all.
 2. **Hetzner Singapore is not the bargain people assume.** Only **0.5 TB included** versus 20 TB in the EU, and overage is **7.40 EUR/TB, over 7x the EU rate**. It is still 10x cheaper than Azure, but if someone in the team says "just use Hetzner", they are probably picturing EU pricing.
-3. **Hetzner raised prices 30 to 35% across the portfolio on 1 April 2026.** Any quote or spreadsheet older than that is stale.
+3. **Hetzner raised prices twice in 2026.** Roughly 30 to 35% across the portfolio on 1 April, then **up to 176% on the CPX and CCX lines on 15 June**. Any quote or spreadsheet older than that is badly stale.
 
 ### 13.4 Four deployment variants, priced and scored
 
@@ -1119,7 +1119,7 @@ quadrantChart
 
 #### Variant C: cheapest possible, multi-provider
 
-Azure or Vultr for ingest, Hetzner EU for the Swarm warm fleet, Vultr Mumbai plus Hetzner Singapore for gateways.
+Azure or Vultr for ingest, Vultr for the Swarm fleet, Vultr Mumbai plus a second low-cost provider for gateways.
 
 | | |
 |---|---|
@@ -1202,7 +1202,7 @@ flowchart TB
     end
     subgraph W4["Swarm warm fleet + WSS entry"]
         D1["Needs: cheap bandwidth, many small nodes,<br/>disk for reserve sync. Geography helps but is secondary."]
-        D2["PUT ON: Hetzner EU for bulk coverage,<br/>plus a few Vultr Mumbai for India-local WSS"]
+        D2["PUT ON: Vultr. Pools bandwidth<br/>across the account, permits nodes,<br/>and has Mumbai"]
     end
     subgraph W5["Control plane"]
         E1["Needs: managed services, reliability,<br/>near-zero egress."]
@@ -1215,7 +1215,9 @@ flowchart TB
     style E2 fill:#c8e6c9,stroke:#2e7d32,color:#1a1a1a
 ```
 
-**The Swarm warm fleet is the one place I would definitely leave Azure regardless of which variant we pick.** A Swarm full node serves chunks to the whole network and earns BZZ at a rate far below $0.08 per GB, so **running it on Azure means paying retail cloud egress to earn cents of BZZ.** Hetzner EU at 20 TB included per instance is close to free for this, and geography matters less for coverage nodes than for gateways. Keep a handful of India-local nodes on Vultr Mumbai for the WSS entry role, where latency does matter.
+**The Swarm warm fleet is the one place I would definitely leave Azure regardless of which variant we pick.** A Swarm full node serves chunks to the whole network and earns BZZ at a rate far below $0.08 per GB, so **running it on Azure means paying retail cloud egress to earn cents of BZZ.**
+
+**Put the whole fleet on Vultr.** It charges $0.01/GB over an allowance that is **pooled across the whole account rather than per instance**, bills nothing for inbound, and has Mumbai, Bangalore and Delhi NCR. That last point removes the split this section used to recommend: the coverage fleet and the India-local WSS nodes can be the same provider and, if we want, the same region, which is one network and one set of secrets instead of two. Working through it on one stage is [poc-deployment.md](poc-deployment.md).
 
 ### 13.6 Risk comparison across variants
 
@@ -1237,7 +1239,7 @@ flowchart TB
 - **Viewer egress via bunny.net Volume**, origin shield on, verified against India PoPs during load testing.
 - **Ingest and transcode on Azure Central India**, where reliability and proximity are worth paying for and egress is negligible anyway.
 - **Origin gateways: 2 to 4 VMs**, anywhere, because a CDN with a near-perfect hit rate makes this small.
-- **Swarm warm fleet on Hetzner EU** for bulk neighborhood coverage, plus a few **Vultr Mumbai** nodes for India-local WSS entry.
+- **Swarm fleet on Vultr** for both bulk neighborhood coverage and India-local WSS entry, because its bandwidth allowance pools across the account and it is the only low-cost option with Indian regions.
 - **Control plane on Azure**, where cost is negligible and managed services save real time.
 
 **Expected all-in at 20 stages and 10k peak: $13,078, against $29,596 for all-Azure. At the 40,000 ceiling: $16,286 against $80,918.** The saving is $16,518 on the event at 10k peak, rising to $64,632 at the ceiling, plus roughly $27,500 on load testing, and it costs less than one engineer-week of extra setup.
@@ -1523,7 +1525,7 @@ Live demos: [weeb-3](https://bzz.limo/bzz/c40a2cd6c8c91f79d25e7b2b12f12413604b9a
 
 **Alternative provider pricing, all checked 2026-07-29:**
 
-- [Hetzner Cloud pricing](https://onedollarvps.com/pricing/hetzner-cloud-pricing): EU regions Germany and Finland include **20 TB** outbound per instance with overage at **1 EUR/TB**. US includes 1 TB. **Singapore includes only 0.5 TB with overage at 7.40 EUR/TB**, over 7x the EU rate. **Hetzner raised prices roughly 30 to 35% across the portfolio on 1 April 2026**, so older quotes are stale. No India region, Singapore is the closest at roughly 60 to 70 ms from Mumbai.
+- [Hetzner Cloud pricing](https://onedollarvps.com/pricing/hetzner-cloud-pricing): EU regions Germany and Finland include **20 TB** outbound per instance with overage at **1 EUR/TB**. US includes 1 TB. **Singapore includes only 0.5 TB with overage at 7.40 EUR/TB**, over 7x the EU rate. **Hetzner raised prices roughly 30 to 35% across the portfolio on 1 April 2026, then up to 176% on the CPX and CCX lines on 15 June 2026**, so older quotes are badly stale. No India region, Singapore is the closest at roughly 60 to 70 ms from Mumbai.
 - [Vultr bandwidth](https://docs.vultr.com/support/platform/billing/what-is-the-bandwidth-overage-rate): **$0.01/GB** overage with 2 TB included per instance. **Has a Mumbai region**, which makes it the strongest India-local low-cost option.
 - DigitalOcean: **$0.02/GB** overage. Bangalore region.
 - [OVHcloud India](https://www.ovhcloud.com/en-in/bare-metal/dedicated-server-india/): has a **Mumbai** data centre, bare metal from 500 Mbps public bandwidth. **Caution: their unlimited-traffic promise explicitly excludes Asia-Pacific**, and APAC VPS tiers carry 1 to 4 TB monthly quotas before throttling to 10 Mbps. Verify the actual Mumbai bare-metal terms in writing before relying on it.
@@ -1556,7 +1558,7 @@ Live demos: [weeb-3](https://bzz.limo/bzz/c40a2cd6c8c91f79d25e7b2b12f12413604b9a
 | **CDN origin shield gives a near-perfect hit rate** | assumed | **The whole Variant D saving rests on this.** Without a shield the saving drops from 93% to 81%, and at Standard Asia rates to 51%. Measure origin pull volume during load testing |
 | Unique content is 2,601 GB, 20 stages, 4-rung ladder | computed | Origin egress under Variant D scales directly with this |
 | Low-cost providers tolerate sustained 10 to 20 Gbps | **unverified** | **Get the traffic profile approved in writing before committing.** An abuse-review suspension mid-event would be self-inflicted and unrecoverable |
-| 12 gateway instances, so per-instance allowances count | 12 | Hetzner EU's 20 TB per instance is why that row reads $0. Fewer instances means less included traffic |
+| 12 gateway instances, so per-instance allowances count | 12 | Why the Hetzner EU row reads $0. On Vultr the allowance pools across the account instead, so instance count matters less |
 | **Both publish lanes produce byte-identical output** | assumed | It is why two lanes cost double postage and egress but add nothing to what the network stores. If the lanes ever diverge, by a transcoder version skew or a non-deterministic encoder setting, the chunk addresses diverge with them and stored volume doubles. **Pin the encoder build and settings across lanes, and assert it in a test** |
 | Load tests hold at peak for the run | 100% of peak | The stress figures in [13.10](#1310-the-load-testing-argument-which-is-the-real-reason-to-pick-d) do not apply the 45% average, because a run that averages 45% is not testing the peak. This makes load-test volume 2.2x the equivalent event hours |
 | **Prefetch fleet cost** | **unpriced** | The base in [13.9](#139-all-in-at-20-stages-the-locked-planning-number) carries $2,100 for 8 to 12 gateways plus a 32 node warm fleet. The design is 640 prefetch nodes on about 80 machines, roughly $7,100 of Azure compute before disks. **The largest open number in this cost model** |

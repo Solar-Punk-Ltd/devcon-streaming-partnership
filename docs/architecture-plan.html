@@ -1227,9 +1227,9 @@ footer b{color:var(--fg-2)}
       </table></div>
       <h4>Three things in that table that surprised me</h4>
       <ul class="tight">
-        <li><strong>Hetzner EU is effectively free on bandwidth.</strong> Twelve instances at 20 TB included each is 240 TB before a euro of overage. But it is 150 ms from Mumbai, the wrong geography for an India-weighted audience.</li>
+        <li><strong>Hetzner EU looks close to free on bandwidth, and the figure is stale.</strong> Twelve instances at 20 TB included each is 240 TB before a euro of overage. Two 2026 price rises have moved that, so treat the row as a benchmark rather than a quote. It is also 150 ms from Mumbai, the wrong geography for an India-weighted audience, and there is no India region at all.</li>
         <li><strong>Hetzner Singapore is not the bargain people assume.</strong> Only 0.5 TB included versus 20 TB in the EU, and overage is 7.40 EUR/TB, over 7&times; the EU rate. Anyone saying "just use Hetzner" is picturing EU pricing.</li>
-        <li><strong>Hetzner raised prices 30 to 35% on 1 April 2026.</strong> Any spreadsheet older than that is stale.</li>
+        <li><strong>Hetzner raised prices twice in 2026.</strong> Roughly 30 to 35% on 1 April, then <strong>up to 176% on the CPX and CCX lines on 15 June</strong>. Any spreadsheet older than that is badly stale.</li>
         <li><strong>Azure Front Door saves nothing on egress, which kills the obvious all-Azure answer.</strong> Its India rates are $0.109/GB to 10 TB and $0.085/GB from 10 to 50 TB, the same as serving straight off Azure VMs, and its published tiers stop at 150 TB per month. Every scenario above 4,000 peak is therefore a sales conversation rather than a price. Front Door is worth having for caching, WAF and DDoS absorption. It is not worth having for money, and the CDN that produces the 93% saving has to be a third party.</li>
       </ul>
       <div class="tw"><table>
@@ -1252,7 +1252,7 @@ footer b{color:var(--fg-2)}
         <li><strong>Ingest and transcode:</strong> Azure Central India. Needs proximity and reliability, egress is negligible.</li>
         <li><strong>Viewer egress:</strong> bunny.net Volume with origin shield, verified against India PoPs.</li>
         <li><strong>Origin gateways:</strong> 2 to 4 VMs anywhere. A near-perfect CDN hit rate makes this small.</li>
-        <li><strong>Swarm warm fleet:</strong> Hetzner EU for bulk coverage, a few Vultr Mumbai for India-local WSS entry. <strong>A full node earns BZZ far below $0.08/GB, so running it on Azure means paying retail cloud egress to earn cents.</strong></li>
+        <li><strong>Swarm fleet:</strong> Vultr, for both bulk coverage and India-local WSS entry. It pools its bandwidth allowance across the account rather than per instance, and it is the only low-cost option with Indian regions, so coverage and India-local nodes stop needing to be two providers. <strong>A full node earns BZZ far below $0.08/GB, so running it on Azure means paying retail cloud egress to earn cents.</strong></li>
         <li><strong>Control plane:</strong> Azure. Cost negligible, managed services save real time.</li>
       </ul>
       <h4>The Cloudflare trap</h4>
