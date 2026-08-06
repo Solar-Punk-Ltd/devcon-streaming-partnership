@@ -108,7 +108,7 @@ export const TOUR = {
     },
     {
       title: "The CDN absorbs the viewers, and the attack",
-      text: "Level 0 serves about 4.4 TB of unique content once. The edge serves it to everyone, about 12 Gbps at EF's expected peak and about 120 Gbps at the forty thousand ceiling we build for. Without the shield each point of presence would pull every segment independently and that number moves by an order of magnitude. The realistic attack here is not knocking us offline, it is running up that bill, so the circuit breaker is a hard egress ceiling that trips before the budget does.",
+      text: "Level 0 serves about 2.4 TB of unique content once. The edge serves it to everyone, about 12 Gbps at EF's expected peak and about 120 Gbps at the forty thousand ceiling we build for. Without the shield each point of presence would pull every segment independently and that number moves by an order of magnitude. The realistic attack here is not knocking us offline, it is running up that bill, so the circuit breaker is a hard egress ceiling that trips before the budget does.",
       open: ["sys", "delivery"], focus: ["shield", "cdn"], light: ["prefetch", "shield", "cdn"], edge: "shield>cdn",
     },
     {
