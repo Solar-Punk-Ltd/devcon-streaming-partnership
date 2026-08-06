@@ -242,3 +242,91 @@ test('the root diagram is the only one without a parent', () => {
   const roots = Object.entries(DIAGRAMS).filter(([, d]) => !d.parent).map(([id]) => id);
   assert.deepEqual(roots, [ROOT_DIAGRAM]);
 });
+
+/* The rates and counts on the cards are authored as strings, which is what keeps
+   objects.js a plain literal with no rendering or arithmetic in it. Nothing in the
+   schema stops two of them drifting apart, and that is exactly what went wrong:
+   the published bitrate, the event content volume and the per-node throughput were
+   all quoting a ladder the transcode worker had stopped describing, and every one
+   of them passed a full test run. These recompute the derived figures from the
+   rungs and the counts they come from, so an edit that moves one and not the others
+   fails here rather than shipping to a page the EF reads. */
+
+const cardMetric = (id, label) => {
+  const row = (OBJECTS[id].metrics || []).find((m) => m[0] === label);
+  assert.ok(row, `${id} has no metric labelled "${label}"`);
+  return row[1];
+};
+const figures = (s) => (String(s).match(/[\d.]+/g) || []).map(Number);
+const figure = (s) => figures(s)[0];
+const plainCount = (s) => Number(String(s).replace(/,/g, ''));
+const round1 = (n) => Math.round(n * 10) / 10;
+
+const EVENT_HOURS = 48;
+const LANES = 2;
+
+test('the published rates agree with the ladder they are derived from', () => {
+  const rungs = [
+    ...figures(cardMetric('worker', '360p / 480p')),
+    ...figures(cardMetric('worker', '720p / 1080p')),
+  ];
+  assert.equal(rungs.length, Number(cardMetric('worker', 'Rungs')));
+
+  const ladder = rungs.reduce((a, b) => a + b, 0);
+  const stages = Number(OBJECTS.pipeline.scale.count);
+
+  assert.equal(
+    Math.round(ladder * stages * LANES),
+    figure(cardMetric('sys', 'Published bitrate')),
+    'published bitrate is the ladder across every stage, on both lanes',
+  );
+
+  // Both lanes write identical bytes to identical addresses, so unique content is one lane.
+  const uniqueTB = (ladder * stages * 1e6 * EVENT_HOURS * 3600) / 8 / 1e12;
+  assert.equal(round1(uniqueTB), figure(cardMetric('sys', 'Event content')));
+  assert.equal(round1(uniqueTB), figure(cardMetric('delivery', 'Unique content')));
+
+  // A prefetch node follows exactly one feed, so it carries exactly one rung.
+  const [perNodeMbps, perNodeGB] = figures(cardMetric('prefetch', 'Per node'));
+  assert.equal(round1(ladder / rungs.length), perNodeMbps);
+  assert.equal(Math.round((perNodeMbps * 1e6 * EVENT_HOURS * 3600) / 8 / 1e9), perNodeGB);
+});
+
+test('the fleet counts multiply out from stages, rungs and lanes', () => {
+  const stages = Number(OBJECTS.pipeline.scale.count);
+  const rungs = Number(cardMetric('worker', 'Rungs'));
+
+  const feedsPerLane = stages * rungs;
+  assert.equal(Number(OBJECTS.beepub.scale.count), feedsPerLane, 'one publisher per rung per stage');
+  assert.equal(Number(OBJECTS.beepubb.scale.count), feedsPerLane, 'and the same again in lane B');
+
+  const feeds = feedsPerLane * LANES;
+  const levels = Number(cardMetric('prefetch', 'Levels'));
+  assert.equal(figure(cardMetric('prefetch', 'Per level')), feeds, 'a level is one node per feed');
+  assert.equal(Number(cardMetric('prefetch', 'Total')), feeds * levels);
+  assert.equal(Number(OBJECTS.prefetch.scale.count), feeds * levels);
+  assert.equal(Number(OBJECTS.delivery.scale.count), feeds * levels);
+});
+
+test('four levels is the first count that reaches every neighborhood', () => {
+  const feeds = Number(cardMetric('prefetch', 'Per level').match(/\d+/)[0]);
+  const levels = Number(cardMetric('prefetch', 'Levels'));
+  const neighborhoods = Number(cardMetric('swarm', 'Depth we cover')) === 9 ? 512 : null;
+  assert.ok(neighborhoods, 'the covered depth should be 9, giving 512 neighborhoods');
+
+  assert.ok(feeds * levels >= neighborhoods, 'the fleet has to reach every neighborhood');
+  assert.ok(feeds * (levels - 1) < neighborhoods, 'and one level fewer must not be enough');
+});
+
+test('the edge is sized at the ceiling times the top rung', () => {
+  const ceiling = plainCount(OBJECTS.viewers.scale.count);
+  const expected = plainCount(cardMetric('viewers', "EF's expected peak"));
+  const sizingMbps = figure(cardMetric('viewers', 'Sizing bitrate'));
+
+  assert.equal((ceiling * sizingMbps) / 1000, figure(cardMetric('viewers', 'Edge sized for')));
+  assert.equal((ceiling * sizingMbps) / 1000, figure(cardMetric('cdn', 'Peak at the 40,000 ceiling')));
+  assert.equal((expected * sizingMbps) / 1000, figure(cardMetric('cdn', "Peak at EF's 4,000")));
+
+  // Costing uses the mean, which cannot be the top rung when most of the audience is on mobile.
+  assert.ok(figure(cardMetric('viewers', 'Modelled average')) < sizingMbps);
+});
