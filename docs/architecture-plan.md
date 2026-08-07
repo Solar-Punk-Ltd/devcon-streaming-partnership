@@ -28,8 +28,11 @@
 > **Which sections are stale:** [6.2](#62-pushback-on-two-servers-per-stage) pods,
 > [7.5](#75-how-many-nodes-do-we-need-and-where) fleet sizing,
 > [8.4](#84-the-degradation-ladder) and [8.5](#85-web2-mirror-choice) the YouTube mirror,
-> and the two fleet rows in [13.2](#132-everything-else). Each one says at its end what
-> replaced it. Everything else, including every number, is current.
+> the two fleet rows in [13.2](#132-everything-else), and the provider ranking in
+> [13.3](#133-provider-comparison-the-same-egress-priced-seven-ways) to
+> [13.7](#137-recommendation), which is superseded by
+> [provider-selection.md](provider-selection.md). Each one says at its end what replaced it.
+> Everything else, including every number, is current.
 
 ---
 
@@ -55,7 +58,7 @@ pie showData title All-Azure cost share, 20 stages at 10k peak concurrent
 
 **And the single largest lever is not engineering, it is where we buy bandwidth.** Because a Swarm segment's address is its content hash, segments are immutably cacheable, which gives a CDN a near-perfect hit rate and collapses the origin fleet to a handful of VMs. That turns the same 20k-peak event from **$35,006 of Azure egress into about $2,451**, a 93% saving, for **under one engineer-week of extra setup**. Full comparison of seven providers and four deployment variants in [13.3](#133-provider-comparison-the-same-egress-priced-seven-ways) and [13.4](#134-four-deployment-variants-priced-and-scored).
 
-**The CDN has to be a third party, and that is a finding rather than a preference.** Azure Front Door egress in India is $0.109/GB to 10 TB and $0.085/GB from 10 to 50 TB, against $0.12 then $0.085 for raw Azure VM egress. They cost the same, so fronting Azure with Azure's own CDN saves nothing. The 93% comes from bunny.net Volume at $0.005/GB. Front Door above 150 TB is quoted "contact sales", so the 40,000 ceiling cannot be priced from published Azure rates at all.
+**The CDN is a third party, and that is a finding rather than a preference.** Azure Front Door egress in India starts at $0.109/GB to 10 TB against $0.12 for raw Azure VM egress, so below about 100 TB fronting Azure with Azure's own CDN saves nothing. Its published tiers do fall steeply above that, to $0.0286/GB from 150 to 500 TB, which is a 62% saving on raw egress at the 40,000 ceiling. It is still four to six times bunny.net Volume at $0.005/GB, which is where the 93% comes from. The live comparison of every candidate, including AWS and CloudFront's flat-rate plans, is in [provider-selection.md](provider-selection.md).
 
 Costed at **20 stages**, the planning number for this document:
 
@@ -1140,7 +1143,7 @@ Azure or Vultr for ingest, Vultr for the Swarm fleet, Vultr Mumbai plus a second
 | **All-in, 20 stages, 40k peak** | **$16,286** |
 | **Extra effort** | **+0.5 to 1 engineer-week**, the lowest of any variant |
 | **Saving vs all-Azure** | **90 to 93%** with origin shield on |
-| **Must not be Azure Front Door** | Front Door India egress matches raw Azure egress, so it saves nothing. bunny Volume, or another third-party CDN. |
+| **Which CDN** | Not Azure Front Door: its India egress matches raw Azure egress up to about 100 TB and stays four to six times bunny Volume above it. bunny Volume, or a CloudFront flat-rate plan. See [provider-selection.md](provider-selection.md). |
 
 **This is both the cheapest realistic option and the least work, which is why it is the recommendation.** A CDN is a managed service we configure, not infrastructure we operate.
 
@@ -1234,6 +1237,8 @@ flowchart TB
 
 ### 13.7 Recommendation
 
+**The shape below still holds; the provider names in it do not. [provider-selection.md](provider-selection.md) re-ran this comparison on 2026-08-07 against AWS as well, scored on DDoS posture and Terraform manageability alongside price, and supersedes the placement bullets here.** In short: the Swarm fleet goes to Vultr, delivery goes to bunny.net Volume or a CloudFront flat-rate plan on a quote, ingest and control follow the CDN, and Azure is out of the build.
+
 **Variant D, with Variant B as the fallback if a CDN is politically unacceptable.**
 
 - **Viewer egress via bunny.net Volume**, origin shield on, verified against India PoPs during load testing.
@@ -1244,7 +1249,7 @@ flowchart TB
 
 **Expected all-in at 20 stages and 10k peak: $13,078, against $29,596 for all-Azure. At the 40,000 ceiling: $16,286 against $80,918.** The saving is $16,518 on the event at 10k peak, rising to $64,632 at the ceiling, plus roughly $27,500 on load testing, and it costs less than one engineer-week of extra setup.
 
-**The CDN must not be Azure Front Door.** Front Door India egress is $0.109/GB to 10 TB and $0.085/GB from 10 to 50 TB, which is the same price as serving straight off Azure VMs, so it delivers the caching, WAF and DDoS absorption but none of the saving. Above 150 TB it is quoted "contact sales", which means the 40,000 ceiling cannot be priced from published rates at all. bunny Volume at $0.005/GB is where the 93% comes from.
+**The CDN should not be Azure Front Door.** Front Door India egress is $0.109/GB to 10 TB and $0.085/GB from 10 to 50 TB, which is the same price as serving straight off Azure VMs, so at 4,000 peak it delivers the caching, WAF and DDoS absorption but none of the saving. Its tiers drop hard above 150 TB, to $0.0286/GB and then $0.0101/GB, so at the 40,000 ceiling it is $26,620 against $69,224 for raw Azure. That is still six times bunny Volume, which at $0.005/GB is where the 93% comes from.
 
 **Do not chase Variant C.** It saves another $1,000 to $2,000 over Variant B and costs 1.5 to 2 extra engineer-weeks, in a plan where engineer-weeks are the actual scarce resource and complexity is the main threat to shipping.
 
@@ -1516,7 +1521,7 @@ Live demos: [weeb-3](https://bzz.limo/bzz/c40a2cd6c8c91f79d25e7b2b12f12413604b9a
 - [Bee hardware and bandwidth guidance](https://blog.ethswarm.org/foundation/2023/bee-node-hardware-requirements/): roughly 10 Mbps per node in normal operation, higher for full nodes due to constant chunk syncing.
 - [Azure Zone 2 egress tiers](https://azure.microsoft.com/en-us/pricing/details/bandwidth/): $0.12/GB first 10 TB, $0.085 for 10 to 50 TB, $0.082 for 50 to 150 TB, $0.08 above, 100 GB free monthly, Central India in Zone 2. Ingress is free.
 - Azure VM list pricing, from the [Azure retail prices API](https://prices.azure.com/api/retail/prices), Central India: `D16as_v5` Linux pay-as-you-go **$0.444/h**, Spot **$0.082/h**, one-year reservation $2,402/yr. `Dasv5` is linear at $0.02775 per vCPU-hour, so `D8as_v5` is $0.222/h and `D4as_v5` $0.111/h.
-- [Azure Front Door pricing](https://azure.microsoft.com/en-us/pricing/details/frontdoor/): Standard $35/mo base, Premium $330/mo. **India egress $0.109/GB to 10 TB, $0.085 for 10 to 50 TB, $0.083 for 50 to 150 TB, and "contact sales" above 150 TB.** Origin-inbound in India is $0.16/GB. This is the same price as raw Azure egress, so Front Door is not the CDN that produces the Variant D saving.
+- Azure Front Door pricing, from the [retail prices API](https://prices.azure.com/api/retail/prices), rechecked 2026-08-07: Standard $35/mo base, Premium $330/mo, WAF and bot management included in Premium. **India is Zone 5: $0.109/GB to 10 TB, $0.085 to 50 TB, $0.082 to 150 TB, $0.0286 to 500 TB, $0.0101 to 1 PB, $0.0091 to 5 PB.** Origin-inbound in India is $0.16/GB. It matches raw Azure egress up to about 100 TB and saves 62% at the 40,000 ceiling, but remains four to six times bunny Volume, so it is not the CDN that produces the Variant D saving.
 - Other Azure rates, Central India: Premium SSD LRS P10 128 GB $19.71/mo, P15 256 GB $38.01, P20 512 GB $73.22, P30 1 TB $135.17. Log Analytics ingestion $3.22/GB with the first 5 GB/mo free, retention $0.14/GB/mo. Standard static public IPv4 $0.005/h.
 - [Azure Media Services is retired](https://learn.microsoft.com/en-us/previous-versions/azure/media-services/latest/azure-media-services-retirement) as of 30 June 2024, so there is no managed Azure encoder and SRS on our own compute is the only path. [Azure CDN from Edgio](https://learn.microsoft.com/en-us/previous-versions/azure/cdn/edgio-retirement-faq) retired 15 January 2025 and [Azure CDN Standard from Microsoft (classic)](https://learn.microsoft.com/en-us/azure/cdn/classic-cdn-retirement-faq) retires 30 September 2027.
 - [Azure penetration testing policy](https://learn.microsoft.com/en-us/azure/security/fundamentals/pen-testing): pre-approval has not been required since June 2017, and simulating high traffic load against your own application is explicitly encouraged. Denial-of-service simulation is a separate gated process. Azure runs automated abuse detection and, per the [Rules of Engagement](https://www.microsoft.com/en-us/msrc/pentest-rules-of-engagement), may interrupt a valid test at its discretion, so open a support case before the large runs.

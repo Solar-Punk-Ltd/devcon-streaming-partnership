@@ -391,7 +391,9 @@ footer b{color:var(--fg-2)}
       <p>The current component design is in the <a href="./">architecture
       explorer</a>.</p>
       <p><b>Which sections are stale.</b> Layer 1's pod argument, the node-fleet sizing, the
-      degradation ladder and the YouTube mirror, and the two fleet rows inside the cost model.
+      degradation ladder and the YouTube mirror, the two fleet rows inside the cost model, and
+      the provider ranking in the cost model, which is superseded by
+      <a href="https://github.com/Solar-Punk-Ltd/devcon-streaming-partnership/blob/main/docs/provider-selection.md">provider-selection.md</a>.
       Each one says at its end what replaced it. Everything else, including every number, is
       current.</p>
     </div>
@@ -1216,7 +1218,7 @@ footer b{color:var(--fg-2)}
         <thead><tr><th>Provider</th><th>Geography</th><th class="n">85.5 TB</th><th class="n">213.8 TB</th><th class="n">427.7 TB</th><th class="n">855.4 TB</th></tr></thead>
         <tbody>
           <tr class="hi"><td class="k">Azure Central India</td><td>India</td><td class="n">$7,506</td><td class="n">$17,899</td><td class="n">$35,006</td><td class="n">$69,221</td></tr>
-          <tr><td class="k">Azure Front Door</td><td>India PoPs</td><td class="n">$7,472</td><td class="n">contact sales</td><td class="n">contact sales</td><td class="n">contact sales</td></tr>
+          <tr><td class="k">Azure Front Door Premium</td><td>India PoPs</td><td class="n">$7,731</td><td class="n">$14,845</td><td class="n">$20,962</td><td class="n">$26,620</td></tr>
           <tr><td class="k">DigitalOcean Bangalore</td><td>India</td><td class="n">$1,470</td><td class="n">$4,036</td><td class="n">$8,314</td><td class="n">$16,868</td></tr>
           <tr><td class="k">Vultr Mumbai</td><td>India</td><td class="n">$615</td><td class="n">$1,898</td><td class="n">$4,037</td><td class="n">$8,314</td></tr>
           <tr><td class="k">Hetzner Singapore</td><td>SEA</td><td class="n">$635</td><td class="n">$1,661</td><td class="n">$3,370</td><td class="n">$6,789</td></tr>
@@ -1230,7 +1232,7 @@ footer b{color:var(--fg-2)}
         <li><strong>Hetzner EU looks close to free on bandwidth, and the figure is stale.</strong> Twelve instances at 20 TB included each is 240 TB before a euro of overage. Two 2026 price rises have moved that, so treat the row as a benchmark rather than a quote. It is also 150 ms from Mumbai, the wrong geography for an India-weighted audience, and there is no India region at all.</li>
         <li><strong>Hetzner Singapore is not the bargain people assume.</strong> Only 0.5 TB included versus 20 TB in the EU, and overage is 7.40 EUR/TB, over 7&times; the EU rate. Anyone saying "just use Hetzner" is picturing EU pricing.</li>
         <li><strong>Hetzner raised prices twice in 2026.</strong> Roughly 30 to 35% on 1 April, then <strong>up to 176% on the CPX and CCX lines on 15 June</strong>. Any spreadsheet older than that is badly stale.</li>
-        <li><strong>Azure Front Door saves nothing on egress, which kills the obvious all-Azure answer.</strong> Its India rates are $0.109/GB to 10 TB and $0.085/GB from 10 to 50 TB, the same as serving straight off Azure VMs, and its published tiers stop at 150 TB per month. Every scenario above 4,000 peak is therefore a sales conversation rather than a price. Front Door is worth having for caching, WAF and DDoS absorption. It is not worth having for money, and the CDN that produces the 93% saving has to be a third party.</li>
+        <li><strong>Azure Front Door saves nothing until the volume is very large, which kills the obvious all-Azure answer.</strong> Its India rates open at $0.109/GB to 10 TB and $0.085/GB from 10 to 50 TB, the same as serving straight off Azure VMs, so at 4,000 peak it costs slightly more than the thing it fronts. The tiers then drop hard, to $0.0286/GB from 150 TB and $0.0101/GB from 500 TB, which is a 62% saving on raw Azure at the 40,000 ceiling. Front Door is worth having for caching, WAF and DDoS absorption. It is still four to six times bunny Volume, so the CDN that produces the 93% saving has to be a third party.</li>
       </ul>
       <div class="tw"><table>
         <caption>Effort and risk, the part price tables hide</caption>
@@ -1248,6 +1250,12 @@ footer b{color:var(--fg-2)}
       1.5 to 2 extra engineer-weeks, in a plan where engineer-weeks are the scarce resource and
       complexity is the main threat to shipping.</p>
       <h4>Where each workload belongs</h4>
+      <p><strong>The shape below still holds; the provider names in it do not.</strong>
+      <a href="https://github.com/Solar-Punk-Ltd/devcon-streaming-partnership/blob/main/docs/provider-selection.md">provider-selection.md</a> re-ran this comparison on
+      2026-08-07 with AWS added, scored on DDoS posture and Terraform manageability alongside
+      price, and supersedes the placements here. In short: the Swarm fleet goes to Vultr,
+      delivery goes to bunny.net Volume or a CloudFront flat-rate plan on a quote, ingest and
+      control follow the CDN, and Azure is out of the build.</p>
       <ul class="tight">
         <li><strong>Ingest and transcode:</strong> Azure Central India. Needs proximity and reliability, egress is negligible.</li>
         <li><strong>Viewer egress:</strong> bunny.net Volume with origin shield, verified against India PoPs.</li>

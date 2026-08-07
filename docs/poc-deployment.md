@@ -1,7 +1,10 @@
 # Single-stage POC: where it runs and what it costs
 
-> **Status:** provider decision and build plan, 2026-08-06.
-> **Decision:** **Vultr Mumbai** for compute, **bunny.net Volume** for delivery.
+> **Status:** build plan, 2026-08-07.
+> **Compute:** **Vultr Mumbai.** Settled, and [provider-selection.md](provider-selection.md)
+> re-tested it against AWS and Azure with the same answer.
+> **Delivery:** a CDN, **bunny.net Volume or a CloudFront flat-rate plan**, decided on a
+> quote. bunny is priced below.
 > **Cost:** **$182/month** for the dev loop, **$444/month** for a rehearsal with 300
 > viewers, **$508/month** with a 3,000-viewer load test on top.
 
@@ -25,17 +28,27 @@ and one stage cannot answer them. Do not let a green POC be read as a green Gate
 
 ---
 
-## 2. Why not Azure
+## 2. Why the fleet is not on a hyperscaler
 
-**Azure was priced and rejected on cost.** Ingest and transcode there are fine, but two
-lines make it the wrong home for this workload. Egress is $0.12/GB against Vultr's $0.01,
-and on a POC the dominant traffic is not viewers, it is the Bee nodes talking to the network.
-A like-for-like single-stage rehearsal came to **$4,243/month on Azure, of which $1,776 was
-egress alone.** The same thing on Vultr is **$924** with the egress line at zero.
+**Both hyperscalers were priced against Vultr and both lose on the same line.** Ingest and
+transcode run fine anywhere. What decides it is that on a POC the dominant traffic is not
+viewers, it is the Bee nodes talking to the network, and a Bee node earns BZZ at a rate
+nowhere near cloud egress list price. Vultr charges $0.01/GB and pools an allowance across
+the account. Azure charges $0.12/GB from the first byte and **AWS charges $0.1093/GB**,
+which is the same money. A like-for-like single-stage rehearsal is **$4,243/month on Azure,
+$1,776 of it egress**, against **$924 on Vultr with the egress line at zero.**
 
-**Azure Front Door is also not the CDN.** Its India egress is $0.109/GB to 10 TB and
-$0.085/GB from 10 to 50 TB, which is the same price as serving straight off a VM, and above
-150 TB per month it has no published price at all. Fronting Azure with Azure saves nothing.
+Compute compounds it. The five machines in section 4 cost $420/month on Vultr, **$977 on
+AWS and $1,030 on Azure** for the same cores, memory and disk. The full comparison,
+including the DDoS and Terraform criteria that price tables miss, is in
+[provider-selection.md](provider-selection.md).
+
+**Neither hyperscaler's CDN is ruled out, and CloudFront's is a real contender.** Its
+flat-rate plans bundle WAF and DDoS and carry no overage charge even during an attack,
+which is a property nothing else here offers. Azure Front Door is cheaper at volume than
+the twenty-stage plan credits it for, but still several times bunny Volume. Section 5 below
+prices bunny because that is what the POC will be built on; the event-scale choice between
+the two is a quote, not an argument.
 
 **On the fleet, the plan's split is worth collapsing.** Section 13.5 spreads the Swarm fleet
 across a bulk-coverage host in Europe and a handful of India-local nodes for the WSS entry
@@ -122,18 +135,22 @@ estimated at 1.0 to 1.5 Mbps per node sustained**. Bandwidth is pooled and inbou
 **The egress column is zero in every row, and that is the whole point.** Estimated usage is
 2.9 TB for the dev loop and 5.1 TB for the rehearsal, against 24 TB pooled and included.
 Even the like-for-like 32-node row uses about 16.9 TB against 42 TB pooled. The same traffic
-on Azure costs $1,776.
+costs $1,778 on Azure and $1,671 on AWS.
 
 Load generators are trivial: 3,000 virtual viewers is about 30 vCPU for three hours, roughly
 $3 at hourly billing, and they pull from bunny rather than from origin.
 
-### Against the Azure figures
+### Against the hyperscaler figures
 
-| | Azure | Vultr + bunny |
-|---|---|---|
-| Rehearsal, 32 prefetch nodes | $4,243 | **$924** |
-| of which egress | $1,776 | **$0** |
-| of which prefetch compute and disk | ~$1,950 | $640 |
+| | Azure | AWS | Vultr + bunny |
+|---|---|---|---|
+| Rehearsal, 32 prefetch nodes | $4,243 | ~$4,100 | **$924** |
+| of which egress | $1,778 | $1,671 | **$0** |
+| of which prefetch compute and disk | ~$1,950 | ~$1,900 | $640 |
+
+**AWS and Azure land within a few percent of each other**, which is the useful result:
+there is no cheaper hyperscaler to escape to. Both meter peer-to-peer egress from the
+first byte, and both charge roughly two and a half times Vultr for the same cores.
 
 ### What is not in these numbers
 
@@ -169,18 +186,24 @@ Bangalore or Delhi NCR has better capacity for the plans above, take it.
 2. **The Bee peer-to-peer egress figure is an estimate**, and it is the largest uncertainty
    here even though it currently costs nothing. Swarm's own guidance is roughly 10 Mbps for a
    full node doing constant chunk syncing, which is 7x the figure used above. At 10 Mbps per
-   node the like-for-like row uses 105 TB and would cost about $630 in overage on Vultr, and
-   would have cost roughly $8,700 on Azure. **Measure two nodes for a week before sizing
+   node the like-for-like row uses 105 TB and would cost about $630 in overage on Vultr,
+   against **$9,102 on Azure and $8,995 on AWS**. **Measure two nodes for a week before sizing
    anything at twenty stages.** It is cheap to measure and it moves the twenty-stage bill more
    than any other single number.
-3. **Vultr is a smaller provider than Azure.** Less headroom to burst, support is not Azure's,
-   and sustained multi-gigabit video from a low-cost VPS is exactly the profile that triggers
-   an abuse review. Immaterial at POC volume; it is a twenty-stage risk, and the mitigation is
-   the same written agreement.
-4. **What we give up.** No managed Kubernetes worth the name, no Front Door-grade WAF, weaker
-   autoscale, and monitoring agents on plain VMs. bunny absorbs DDoS at the edge, which covers
-   the biggest of those. The plan budgets 1.5 to 2.5 engineer-weeks for this at twenty stages;
-   at one stage it is days.
+3. **Vultr is a smaller provider than either hyperscaler.** Less headroom to burst, support is
+   not theirs, and sustained multi-gigabit video from a low-cost VPS is exactly the profile
+   that triggers an abuse review. Immaterial at POC volume; it is a twenty-stage risk, and the
+   mitigation is the same written agreement.
+4. **The transcode host cannot have Vultr's DDoS protection.** The add-on is $10/month per
+   instance and is offered on Cloud Compute and High Frequency plans;
+   `voc-c-8c-16gb-150s-amd` is Optimized Cloud Compute and is not eligible. Move it to a
+   `vhf` plan, put it behind something, or accept that it is unprotected. Decide before the
+   fleet is built. The add-on is also **layer 3 and 4 only**, so it is not an answer to
+   application-layer attack on any host.
+5. **What we give up.** No managed Kubernetes worth the name, no Front Door-grade WAF, weaker
+   autoscale, and monitoring agents on plain VMs. The CDN absorbs DDoS at the edge, which
+   covers the biggest of those. The plan budgets 1.5 to 2.5 engineer-weeks for this at twenty
+   stages; at one stage it is days.
 
 ---
 
@@ -191,24 +214,33 @@ Bangalore or Delhi NCR has better capacity for the plans above, take it.
    storage-incentive rewards, not mining.
 2. Stand up the dev loop, five instances, and get one stage end to end.
 3. **Instrument Bee egress per node from day one.** See risk 2.
-4. Open the bunny.net account, confirm the Volume tier reaches India acceptably, and **verify
-   origin shield is actually on** before quoting any saving that depends on it.
-5. Fund 8 postage batches and 8 chequebooks, and let them run unattended for a week to see
+4. Open the bunny.net account, **measure what the Volume tier does for India** given its
+   nearest PoPs are Singapore and Hong Kong rather than Mumbai, and **verify origin shield is
+   actually on** before quoting any saving that depends on it.
+5. **In parallel, pull a configured CloudFront Premium quote** at the event's volumes. It
+   costs nothing to ask and it is the only way to settle the delivery choice. See
+   [provider-selection.md](provider-selection.md) section 7.
+6. Fund 8 postage batches and 8 chequebooks, and let them run unattended for a week to see
    whether the lifecycle automation holds.
-6. Only then add prefetch levels 1 to 3 and start asking network questions.
+7. Only then add prefetch levels 1 to 3 and start asking network questions.
 
 ---
 
 ## Sources
 
-Checked 2026-08-06.
+Checked 2026-08-06, hyperscaler and DDoS figures rechecked 2026-08-07.
 
 - Vultr plans and regions, [public API](https://api.vultr.com/v2/plans): Mumbai `bom`,
   Bangalore `blr`, Delhi NCR `del`. All plan prices above are from this endpoint.
 - [Vultr blockchain solutions](https://www.vultr.com/solutions/blockchain/): node hosting as a supported workload.
 - [Vultr bandwidth overage](https://docs.vultr.com/support/platform/billing/what-is-the-bandwidth-overage-rate):
   $0.01/GB. [Global pooling and free ingress](https://www.vultr.com/news/Vultr-Announces-Reduced-Bandwidth-Pricing-2-Tb-Of-Free-Monthly-Egress-Free-Ingress-And-Global-Pooling/).
+- [Vultr DDoS Protection](https://docs.vultr.com/ddos-protection): 10 Gbps per instance, layers
+  3 and 4, Cloud Compute and High Frequency plans only,
+  [$10 per instance per month](https://docs.vultr.com/support/platform/billing/how-much-does-ddos-protection-cost).
 - Hetzner June 2026 price increase: [CPX and CCX up to +176%](https://wz-it.com/en/blog/hetzner-price-increase-june-2026-cpx-ccx-alternatives/).
-- [bunny.net pricing](https://bunny.net/pricing/): Volume tier $0.005/GB.
-- Azure comparison figures from [architecture-plan.md](architecture-plan.md) section 13 and
-  the Azure retail prices API.
+- [bunny.net pricing](https://bunny.net/pricing/): Volume tier $0.005/GB, no per-request fee.
+  [Volume network PoPs](https://bunny.net/network/): 10 globally, none in India.
+- AWS and Azure comparison figures are derived in
+  [provider-selection.md](provider-selection.md) from the AWS metered unit maps and the
+  [Azure retail prices API](https://prices.azure.com/api/retail/prices).
