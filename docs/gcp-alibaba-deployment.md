@@ -33,11 +33,18 @@ So the recommendation is a split, not a winner:
 | Ingest, transcode, packaging | **GCP `asia-south1` (Mumbai)** | India proximity, Live Stream and Transcoder APIs both available there, egress is negligible |
 | Viewer delivery | **GCP Media CDN** | $34,485 at the 40,000 ceiling against Azure's $69,232, and it is a real video product rather than a general load balancer |
 | Control plane, monitoring, probes | **GCP `asia-south1`** | managed services, near-zero egress, one IAM domain to reason about |
-| **Swarm publisher and prefetch fleet** | **neither** | see [the egress wall](#the-egress-wall) — this needs a flat-rate or included-bandwidth host and remains an open procurement item |
+| **Swarm publisher and prefetch fleet** | **neither — see [fleet-hosting.md](fleet-hosting.md)** | [the egress wall](#the-egress-wall) makes metered per-GB pricing unaffordable here. Unmetered bare metal in Mumbai carries the same fleet for **about $7,500 a month at any throughput**, with the India-local tier on Vultr |
 
 **Alibaba Cloud is not recommended in any role.** It loses the geography outright, and its
 only structural advantage over GCP is a marginally cheaper flat egress rate that the
 architecture cannot exploit.
+
+**The fleet has a costed answer and it is not on either provider.**
+[fleet-hosting.md](fleet-hosting.md) prices five hosting shapes against the same traffic model
+and lands on a split: bulk coverage nodes on unmetered Mumbai bare metal, India-local WSS entry
+and publisher nodes on Vultr Mumbai. That is **$7,500 against $63,205 on GCP** at the
+optimistic estimate, and the gap widens to 34x at Swarm's own. It is the single largest saving
+available anywhere in this document.
 
 ---
 
@@ -104,14 +111,32 @@ nodes cost more in egress than 40,000 concurrent viewers do. That is the whole r
 fleet cannot live on metered per-GB pricing, on these two providers or any other in their
 class.
 
+### The way out is to stop paying per GB
+
+An unmetered port removes this line from the bill entirely. 800 nodes at even the pessimistic
+10 Mbps is 8 Gbps aggregate, which spread across 25 bare-metal boxes is 320 Mbps each —
+comfortably inside a 1 Gbps unmetered port. Bare metal in Mumbai with such a port runs about
+$7,500 a month for the whole fleet, **and costs the same whatever the per-node figure turns out
+to be**.
+
+[fleet-hosting.md](fleet-hosting.md) works this through against five hosting shapes and two
+packing densities. Its conclusions in brief: Vultr remains the best *metered* option at $9,515
+and is the right home for the India-local tier; unmetered metal is the right home for the bulk
+coverage fleet; and the plan's assumption of 8 nodes per machine costs more than the choice of
+provider does, because 32 nodes fit on one box and disk binds before CPU.
+
 ### The number that decides this is still unmeasured
 
 The spread between $20,785 and $205,455 is a single unmeasured constant: sustained
 per-node peer-to-peer throughput. The costing carries 1.0 to 1.5 Mbps; Swarm's own guidance
 for a full node doing constant chunk syncing is nearer 10 Mbps. **Two nodes instrumented for
-a week settles it**, and until it is settled no provider decision for the fleet can be made
-with confidence. It is the cheapest item on the list and it moves the twenty-stage bill more
-than anything else in this document.
+a week settles it**, using [../tools/bee-egress/](../tools/bee-egress/). It is the cheapest
+item on the list and it moves the twenty-stage bill more than anything else in this document.
+
+**This is also the strongest argument for the unmetered shape.** Every metered option swings by
+2x to 4x on a number we do not have, so choosing one now is a bet on the measurement. An
+unmetered port is the same price either way, which buys certainty rather than the theoretical
+minimum — worth having with the event in November.
 
 ---
 
@@ -156,9 +181,9 @@ What each piece of the architecture would actually run on.
 | HLS packaging and manifests | Live Stream API output, or self-managed | ApsaraVideo Live, or self-managed |
 | Origin storage | Cloud Storage, `asia-south1` bucket | OSS, Singapore bucket |
 | Viewer delivery CDN | **Media CDN** — built on Google's video-serving edge | Alibaba CDN / DCDN, quote-only pricing |
-| Swarm publisher nodes | **Do not place here** — see the egress wall | **Do not place here** |
-| Swarm prefetch fleet, 640 nodes | **Do not place here** | **Do not place here** |
-| India-local WSS entry nodes | technically fits `asia-south1`, but pays VM egress | **no India region at all** |
+| Swarm publisher nodes | **Do not place here** — see the egress wall. Vultr Mumbai instead | **Do not place here** |
+| Swarm prefetch fleet, 640 nodes | **Do not place here** — unmetered Mumbai metal instead | **Do not place here** |
+| India-local WSS entry nodes | technically fits `asia-south1`, but pays VM egress. Vultr Mumbai instead | **no India region at all** |
 | Container orchestration | GKE, Autopilot or Standard | ACK |
 | DDoS and WAF | **Cloud Armor**, integrated with the load balancer | **Anti-DDoS** (Basic free, Pro/Premium paid) + WAF |
 | Secret management | Secret Manager | KMS Secrets Manager |
@@ -262,10 +287,10 @@ flowchart TB
         C["Media CDN — viewer delivery"]
         M["Control plane, monitoring, probes<br/>Cloud Armor on the edge"]
     end
-    subgraph OPEN["Swarm fleet — provider still open"]
-        PUB["160 publisher nodes"]
-        PRE["640 prefetch nodes,<br/>4 levels"]
-        WSS["India-local WSS entry nodes<br/>nothing local exists to dial today"]
+    subgraph OPEN["Swarm fleet — see fleet-hosting.md"]
+        PUB["160 publisher nodes<br/>Vultr Mumbai"]
+        PRE["640 prefetch nodes, 4 levels<br/>unmetered Mumbai metal, ~25 boxes"]
+        WSS["India-local WSS entry nodes<br/>Vultr Mumbai — nothing local exists to dial today"]
     end
     I --> T --> O
     O --> C
@@ -278,9 +303,12 @@ flowchart TB
 
 **Phase it.** The web2 half can be built on GCP now, because ingest, transcode, delivery and
 control plane are all well served in `asia-south1` and none of them is blocked on the
-unmeasured egress constant. The Swarm half cannot be committed until per-node throughput is
-measured, and the answer decides whether the fleet needs a flat-rate host, a much smaller
-prefetch footprint, or a renegotiated design.
+unmeasured egress constant.
+
+The Swarm half is costed in [fleet-hosting.md](fleet-hosting.md) and its recommendation is
+deliberately the shape that survives the measurement either way, so it does not have to wait
+for it. What the measurement still decides is whether the four-level placement is affordable at
+all and whether 25 boxes is the right count — not which provider to talk to.
 
 ---
 
@@ -288,21 +316,24 @@ prefetch footprint, or a renegotiated design.
 
 Ordered by how much each one moves the decision.
 
-1. **Measure sustained Bee peer-to-peer egress on two nodes for a week.** Blocks the entire
-   fleet-hosting decision, and the spread it resolves is $20,785 to $205,455 a month. No
-   external dependency.
-2. **Get a written workload confirmation, whoever hosts the fleet.** Sustained multi-gigabit
-   video alongside hundreds of long-lived peer-to-peer connections is an unusual profile.
-   Have the workload described and accepted in writing before building on it. An abuse or
-   fair-use review during the event is unrecoverable.
-3. **Quote GCP Media CDN with committed use.** The list-price figures above are the ceiling.
+1. **Measure sustained Bee peer-to-peer egress on two nodes for a week**, with
+   [../tools/bee-egress/](../tools/bee-egress/). The spread it resolves is $20,785 to $205,455
+   a month. No external dependency.
+2. **Test packing density on one box for one day.** 32 Bee nodes through a full reserve sync.
+   Settles a 4x range on fleet compute, and it is the cheapest test on this list. See
+   [fleet-hosting.md](fleet-hosting.md).
+3. **Get the fair-use number in writing from the unmetered hosts**, and a written workload
+   confirmation from whoever hosts the fleet. Sustained multi-gigabit traffic alongside hundreds
+   of long-lived peer-to-peer connections is an unusual profile, and "unmetered" often carries
+   an unpublished cap. An abuse or fair-use review during the event is unrecoverable.
+4. **Quote GCP Media CDN with committed use.** The list-price figures above are the ceiling.
    At 855 TB there is real room, and the $34,485 line is the one worth negotiating.
-4. **Quote a flat-rate or included-bandwidth host for the 800-node fleet, in or near India.**
-   This is now the critical path item and there is no incumbent candidate.
-5. **Confirm GCP Standard Tier egress rates for `asia-south1`.** Standard Tier is cheaper
+5. **Quote Vultr Mumbai for the India-local tier**, roughly 200 nodes across `bom`, `blr` and
+   `del`, per [fleet-hosting.md](fleet-hosting.md).
+6. **Confirm GCP Standard Tier egress rates for `asia-south1`.** Standard Tier is cheaper
    than the Premium figures used here and may suit the fleet's WSS entry nodes, where
    Google's premium backbone buys us nothing.
-6. **Price the 640-node prefetch fleet's disks.** Reserve sync is disk-heavy and every
+7. **Price the 640-node prefetch fleet's disks.** Reserve sync is disk-heavy and every
    compute figure in this document excludes storage.
 
 ---
@@ -311,8 +342,9 @@ Ordered by how much each one moves the decision.
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| Per-node P2P egress lands near 10 Mbps | **critical** | measure it this week; if confirmed, the four-level placement needs rethinking before any provider is chosen |
-| No flat-rate fleet host is found in time | **high** | fall back to fewer prefetch levels and accept more hops, or run the fleet outside India and accept the latency |
+| Per-node P2P egress lands near 10 Mbps | **critical** | measure it this week; the unmetered fleet shape in [fleet-hosting.md](fleet-hosting.md) is priced to absorb it, but the four-level placement may still need rethinking |
+| "Unmetered" turns out to carry a fair-use cap | **high** | get the number in writing before ordering; if they will not give one, treat the port as metered and fall back to Vultr's $0.01/GB |
+| Unmetered hosts are smaller companies with thinner support | medium | keep them to bulk coverage nodes, whose failure mode is a colder cache; the latency-critical India tier stays on Vultr |
 | Managed media lock-in | medium | keep the self-managed ffmpeg path working in parallel; the ladder is ours either way |
 | No India-local WSS nodes exist but ours | medium | this is already the plan's assumption; the scan confirms it rather than changing it |
 | Media CDN committed-use terms outlast the event | low | negotiate a 1-month or event-scoped commitment |
