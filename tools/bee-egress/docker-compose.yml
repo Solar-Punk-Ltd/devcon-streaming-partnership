@@ -1,0 +1,51 @@
+# Two Bee nodes for the peer-to-peer egress measurement.
+#
+# Each node gets its own container, and therefore its own network namespace,
+# which is what makes the measurement clean: every byte on the container's
+# eth0 is Bee's, and nothing else on the host is counted.
+#
+# See README.md. Set BEE_PASSWORD in a .env file beside this one.
+
+services:
+  bee-a:
+    image: ethersphere/bee:2.8.0
+    container_name: bee-egress-a
+    restart: unless-stopped
+    environment:
+      BEE_API_ADDR: 127.0.0.1:1633
+      BEE_P2P_ADDR: :1634
+      BEE_FULL_NODE: "true"
+      BEE_SWAP_ENABLE: "true"
+      BEE_PASSWORD: ${BEE_PASSWORD:?set BEE_PASSWORD in .env}
+      BEE_BLOCKCHAIN_RPC_ENDPOINT: ${RPC_ENDPOINT:?set RPC_ENDPOINT in .env}
+      # AutoTLS, so the node is WSS-reachable like the fleet nodes will be.
+      BEE_P2P_WSS_ENABLE: "true"
+      BEE_P2P_WSS_ADDR: :1635
+    volumes:
+      - bee-a-data:/home/bee/.bee
+    ports:
+      - "1634:1634"
+      - "1635:1635"
+
+  bee-b:
+    image: ethersphere/bee:2.8.0
+    container_name: bee-egress-b
+    restart: unless-stopped
+    environment:
+      BEE_API_ADDR: 127.0.0.1:1633
+      BEE_P2P_ADDR: :1644
+      BEE_FULL_NODE: "true"
+      BEE_SWAP_ENABLE: "true"
+      BEE_PASSWORD: ${BEE_PASSWORD:?set BEE_PASSWORD in .env}
+      BEE_BLOCKCHAIN_RPC_ENDPOINT: ${RPC_ENDPOINT:?set RPC_ENDPOINT in .env}
+      BEE_P2P_WSS_ENABLE: "true"
+      BEE_P2P_WSS_ADDR: :1645
+    volumes:
+      - bee-b-data:/home/bee/.bee
+    ports:
+      - "1644:1644"
+      - "1645:1645"
+
+volumes:
+  bee-a-data:
+  bee-b-data:
