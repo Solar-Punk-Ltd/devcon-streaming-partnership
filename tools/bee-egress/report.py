@@ -2,7 +2,7 @@
 """Turn sample.sh's CSV into a sustained-throughput figure and a fleet bill.
 
 This closes the single largest open number in the cost model. The costing in
-docs/gcp-alibaba-deployment.md carries 1.0 to 1.5 Mbps of sustained
+docs/feasibility/gcp-alibaba-deployment.md carries 1.0 to 1.5 Mbps of sustained
 peer-to-peer egress per Bee node; Swarm's own guidance for a full node doing
 constant chunk syncing is nearer 10 Mbps. On a 800-node fleet that is the
 difference between roughly $21,000 and $205,000 a month, so it is worth
@@ -21,7 +21,7 @@ import json
 import statistics
 from collections import defaultdict
 
-# Rate cards, kept identical to docs/gcp-alibaba-deployment.md so the two
+# Rate cards, kept identical to docs/feasibility/gcp-alibaba-deployment.md so the two
 # documents cannot drift. All per-GB / per-GiB, list price, egress only.
 GiB_PER_TB = 1000 / 1.073741824
 GCP_VM_PREMIUM = [(1, 0.12), (10, 0.11), (float("inf"), 0.085)]  # $/GiB, upto TiB

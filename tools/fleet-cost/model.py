@@ -16,7 +16,7 @@ that does not need the measurement to come back favourable.
 Prices pulled from provider APIs on 2026-08-12:
   Vultr    api.vultr.com/v2/plans and /plans-metal, region bom (Mumbai)
   Oracle   apexapps.oracle.com/pls/apex/cetools/api/v1/products
-  GCP      list price, see docs/gcp-alibaba-deployment.md
+  GCP      list price, see docs/feasibility/gcp-alibaba-deployment.md
 """
 from __future__ import annotations
 

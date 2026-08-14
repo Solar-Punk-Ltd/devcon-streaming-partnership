@@ -5,7 +5,7 @@ The 800-node fleet is the one workload no hyperscaler can carry, and
 This is the answer to that item. Written 2026-08-12.
 
 Prices pulled live on 2026-08-12 from Vultr's public plans API (`bom`, Mumbai) and Oracle's
-public price list API. Model and workings in [../tools/fleet-cost/model.py](../tools/fleet-cost/model.py).
+public price list API. Model and workings in [../tools/fleet-cost/model.py](../../tools/fleet-cost/model.py).
 
 ---
 
@@ -157,7 +157,7 @@ Cheap European bandwidth is genuinely the lowest per-GB rate available, and the 
 table still shows it that way. Two findings rule it out for this fleet regardless of price.
 
 **It has no India region**, so it cannot host the WSS entry tier, which
-[measurements/wss-reachability.md](measurements/wss-reachability.md) shows is the tier that
+[measurements/wss-reachability.md](../measurements/wss-reachability.md) shows is the tier that
 actually needs to exist.
 
 **And it would concentrate the risk rather than spread it.** 2,045 of the 2,065 WSS-reachable
@@ -173,7 +173,7 @@ to add independence. Buying it in the same place buys none.
 1. **Density test, one box, one day.** 32 Bee nodes on a single machine through a full reserve
    sync. Settles a 4x cost range, and it is the cheapest test on this list.
 2. **Egress measurement, two nodes, one week**, with
-   [../tools/bee-egress/](../tools/bee-egress/). Settles a 3.4x cost range. Run it on a
+   [../tools/bee-egress/](../../tools/bee-egress/). Settles a 3.4x cost range. Run it on a
    candidate unmetered box so it doubles as a provider trial.
 3. **Get the fair-use number in writing** from two or three Mumbai metal providers, then take
    one box for a month.

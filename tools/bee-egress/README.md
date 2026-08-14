@@ -4,7 +4,7 @@
 egress per Bee node. Swarm's own guidance for a full node doing constant chunk syncing is
 nearer **10 Mbps**. Across the 800-node fleet that single constant is the difference between
 roughly **$21,000 and $205,000 a month** on metered egress, which is more than any other
-number in [../../docs/gcp-alibaba-deployment.md](../../docs/gcp-alibaba-deployment.md) moves.
+number in [../../docs/feasibility/gcp-alibaba-deployment.md](../../docs/feasibility/gcp-alibaba-deployment.md) moves.
 Two nodes and a week of patience settle it.
 
 It is also the cheapest open item on the list, and it depends on nothing from the EF.

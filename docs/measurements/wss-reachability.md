@@ -42,7 +42,7 @@ effectively automatic: every node running 2.8.x advertises a working
 A browser node in Mumbai has **nothing local to dial**. It opens its connection pool to
 Europe, at roughly 120 to 150 ms, while retrieving 2-second segments. This makes the
 India-local WSS entry role entirely ours to fill, and it has to be in India — which is why it
-became decisive in the [provider plan](../gcp-alibaba-deployment.md).
+became decisive in the [provider plan](../feasibility/gcp-alibaba-deployment.md).
 
 ### The reachable set is one hosting network
 

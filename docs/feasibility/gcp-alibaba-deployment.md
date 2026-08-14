@@ -5,7 +5,7 @@ use and available components. Written 2026-08-12.
 
 All figures are pay-as-you-go list price with no reservations, committed-use discounts or
 negotiated terms. **Everything here is a starting position for a quote, not a quote.**
-Volumes come from [architecture-plan.md](architecture-plan.md) §13.1 so the numbers are
+Volumes come from [architecture-plan.md](../architecture-plan.md) §13.1 so the numbers are
 comparable with the rest of the cost model.
 
 ---
@@ -130,7 +130,7 @@ provider does, because 32 nodes fit on one box and disk binds before CPU.
 The spread between $20,785 and $205,455 is a single unmeasured constant: sustained
 per-node peer-to-peer throughput. The costing carries 1.0 to 1.5 Mbps; Swarm's own guidance
 for a full node doing constant chunk syncing is nearer 10 Mbps. **Two nodes instrumented for
-a week settles it**, using [../tools/bee-egress/](../tools/bee-egress/). It is the cheapest
+a week settles it**, using [../tools/bee-egress/](../../tools/bee-egress/). It is the cheapest
 item on the list and it moves the twenty-stage bill more than anything else in this document.
 
 **This is also the strongest argument for the unmetered shape.** Every metered option swings by
@@ -142,7 +142,7 @@ minimum — worth having with the event in November.
 
 ## Why India presence is not negotiable
 
-The four-level prefetch fleet is not only a cache. Per [architecture-plan.md](architecture-plan.md)
+The four-level prefetch fleet is not only a cache. Per [architecture-plan.md](../architecture-plan.md)
 §7.4 it is also the **WSS entry layer** that makes in-browser nodes possible at all, because
 browsers can only dial nodes that speak `wss://`.
 
@@ -156,7 +156,7 @@ trusting the advertised address. That is far better coverage than the plan assum
   single hosting company. The browser-dialable Swarm network is effectively one provider's
   German network.
 
-Full method and figures in [measurements/wss-reachability.md](measurements/wss-reachability.md).
+Full method and figures in [measurements/wss-reachability.md](../measurements/wss-reachability.md).
 
 Two consequences for this decision. First, **a browser node in Mumbai today has nothing
 local to dial**, so the India-local WSS entry role has to be ours to fill and it needs to be
@@ -317,7 +317,7 @@ all and whether 25 boxes is the right count — not which provider to talk to.
 Ordered by how much each one moves the decision.
 
 1. **Measure sustained Bee peer-to-peer egress on two nodes for a week**, with
-   [../tools/bee-egress/](../tools/bee-egress/). The spread it resolves is $20,785 to $205,455
+   [../tools/bee-egress/](../../tools/bee-egress/). The spread it resolves is $20,785 to $205,455
    a month. No external dependency.
 2. **Test packing density on one box for one day.** 32 Bee nodes through a full reserve sync.
    Settles a 4x range on fleet compute, and it is the cheapest test on this list. See
@@ -356,7 +356,7 @@ Ordered by how much each one moves the decision.
 
 This document replaces the Vultr-and-CDN provider position for planning purposes, following
 the decision on 2026-08-12 to plan with Google Cloud and Alibaba Cloud instead. The
-workload-placement guidance in [architecture-plan.md](architecture-plan.md) §13.3 and §13.5
+workload-placement guidance in [architecture-plan.md](../architecture-plan.md) §13.3 and §13.5
 still reflects the earlier provider set and needs a follow-up pass to match this document;
 until then, treat this file as current on provider choice and the plan as current on
 everything else.
