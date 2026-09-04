@@ -45,6 +45,7 @@ cost more than the event itself.
 | [docs/architecture-plan.html](docs/architecture-plan.html) | 2026-07-29 | The same plan written for reading rather than for reference. Same caveat. |
 | [docs/handover.md](docs/handover.md) | 2026-07-22 | The partnership brief for the EF. Written under the Swarm-only decision, so its delivery claims are superseded. Everything about scope, the split of responsibility and what we need from them still holds. |
 | [docs/questionnaire.md](docs/questionnaire.md) | 2026-07-22 | Priority-tagged questions for the Devcon team across scope, feed spec, venue, scale, UX, archive, ops and commercial terms. Q17 and Q24 carry superseded numbers. |
+| [docs/rollout/two-stage-terraform.md](docs/rollout/two-stage-terraform.md) | 2026-08-14 | The two-stage pilot on Google Cloud: two stage hosts, monitoring, and the Bee publishers out of scope on our own machines. Implemented in [terraform/](terraform/); [terraform/README.md](terraform/README.md) is the runbook. |
 
 ## What has moved since the older documents
 
@@ -61,6 +62,29 @@ reflected in the July documents.
 | Three shared origin gateways serve every stage | One prefetch node per feed, so no shared component sits behind the stages |
 | A coverage fleet seeds 256 neighborhoods | Four levels of 160 prefetch nodes, reaching all 512 neighborhoods at depth 9 |
 | The player picks its tier and its rung | Neither. hls.js switches rungs off the master playlist and HLS fails over to a redundant stream, both without code from us |
+
+## What the pilot costs to run
+
+The pilot bills mostly for existing, not for streaming: idle egress is nothing, and the stage
+machines are ~80% of the bill — each a `t2d-standard-8`, eight physical cores, chosen over n2 for
+both price and transcode throughput. List-price estimates, ±5%, worth one calculator pass before
+the first apply:
+
+| State | Running | ≈ per day |
+|---|---|---|
+| Monitoring only (M1) | e2-standard-2, disks, one static address | **$2.50** |
+| Stage 1 live (M2) | + a t2d-standard-8 in Frankfurt | **$13** |
+| Both stages (M3) | + a t2d-standard-8 in Mumbai | **$19** |
+| Paused between test windows | instances stopped; disks, addresses and TSDB kept | **$1** |
+
+Neither T2D nor E2 earns a sustained-use discount, and test windows sit below the
+quarter-of-month threshold where SUD starts — windows pay list either way. Streaming adds egress
+on top: roughly $24 for a 40-hour test week of two stages, ~$425/month left running (GCP bills
+GiB, and 216 GB is 201 GiB) — the arithmetic in the
+[rollout plan](docs/rollout/two-stage-terraform.md). Spot instances would take 60% off the
+machines, but a preemption voids a measured run: drills only, and never the monitoring host.
+Pause by **stopping the instances**, not `terraform destroy`: destroy releases the static
+addresses a Hetzner-side allowlist would key on and deletes the monitoring history with them.
 
 ## Running the architecture explorer
 
