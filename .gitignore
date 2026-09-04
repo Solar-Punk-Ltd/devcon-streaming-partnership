@@ -6,3 +6,16 @@ node_modules/
 # Local editor and agent preferences, not shared
 .claude/settings.local.json
 __pycache__/
+
+# Terraform
+terraform/**/.terraform/
+terraform/**/*.tfstate
+terraform/**/*.tfstate.*
+terraform/rendered/*
+!terraform/rendered/.gitkeep
+terraform/**/*.tfplan
+terraform/**/tfplan
+# Written by terraform/scripts/allow-me.sh: an operator laptop address for one test window, never committed
+terraform/operator.auto.tfvars
+crash.log
+crash.*.log
