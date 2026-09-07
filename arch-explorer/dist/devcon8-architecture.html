@@ -1436,6 +1436,7 @@ const GROWS = {
   VIEWERS: 'viewers',
   COVERAGE: 'coverage',
   REGIONS: 'regions',
+  BRANDS: 'brands',
   FIXED: 'fixed',
 };
 
@@ -1455,6 +1456,7 @@ const GROWS_LABEL = Object.freeze({
   [GROWS.VIEWERS]: 'Grows with viewers',
   [GROWS.COVERAGE]: 'Grows with coverage',
   [GROWS.REGIONS]: 'One per region',
+  [GROWS.BRANDS]: 'Grows with brands',
   [GROWS.FIXED]: 'Fixed size',
 });
 
@@ -2286,6 +2288,11 @@ __mods["model/tags.js"] = function (__exports, __req) {
  * Membership is listed explicitly here rather than as a field on each object,
  * so the whole answer to "what breaks together" is readable in one place.
  * `technology` is the exception: it derives from each object's own tech list.
+ *
+ * The definitions in this file are the Devcon 8 model's. The MVP model brings
+ * its own, in ./mvp/tags.js, and everything below them is shared: the builder
+ * takes an ordered list of definitions and fills in the two derived groups
+ * wherever that list asks for them.
  */
 
 const { RESILIENCE_TAGS, resilienceMembers } = __req("model/scale.js");
@@ -2314,7 +2321,7 @@ const BLAST_MEMBERS = {
   [BLAST.EXTERNAL]: ['av', 'swarm', 'viewers', 'browsernode'],
 };
 
-const PLACE_MEMBERS = {
+const DEVCON_PLACE_MEMBERS = {
   venue: ['av', 'record'],
   cloud: [
     'sys', 'venueacl',
@@ -2329,7 +2336,7 @@ const PLACE_MEMBERS = {
 };
 
 /** Tag colours are single values that hold up on both the light and dark ground. */
-const GROUP_DEFS = [
+const DEVCON_GROUP_DEFS = [
   {
     id: 'blast',
     name: 'Blast radius',
@@ -2353,6 +2360,11 @@ const GROUP_DEFS = [
     ],
     members: BLAST_MEMBERS,
   },
+  // The derived groups are ordered here rather than by the builder, so the
+  // bar reads the way a reliability review asks the questions: what breaks
+  // together, how many are there and what covers one, where does it run,
+  // what is it built of.
+  { derive: 'scale' },
   {
     id: 'place',
     name: 'Where it runs',
@@ -2365,8 +2377,9 @@ const GROUP_DEFS = [
       { id: 'device', name: 'Viewer device', color: '#2E8B63', hint: '70% of them a phone.' },
       { id: 'thirdparty', name: 'Third party', color: '#7C8B93', hint: 'Someone else runs it entirely.' },
     ],
-    members: PLACE_MEMBERS,
+    members: DEVCON_PLACE_MEMBERS,
   },
+  { derive: 'tech' },
 ];
 
 /**
@@ -2412,28 +2425,28 @@ function technologyGroup(objects) {
   return { id: 'tech', name: 'Technology', hint: 'What each piece is actually built from.', tags, members };
 }
 
+/** The groups a definition list can ask to have built for it. */
+const DERIVED = { [SCALE_GROUP]: resilienceGroup, tech: technologyGroup };
+
 /**
  * Group definitions with per-tag object sets resolved and counted, in the
- * order a reliability review asks the questions: what breaks together, how
- * many are there and what covers one, where does it run, what is it built of.
+ * order the definitions give them. A definition asking to `derive` a group is
+ * filled in from the objects, so a model can say where the derived groups sit
+ * without knowing how either one is built. A tag no object carries is dropped
+ * rather than drawn as an empty chip.
  */
-function buildTagGroups(objects) {
-  const statics = Object.fromEntries(GROUP_DEFS.map((g) => [g.id, g]));
-  const ordered = [
-    statics.blast,
-    resilienceGroup(objects),
-    statics.place,
-    technologyGroup(objects),
-  ];
-  return ordered.map((g) => ({
-    id: g.id,
-    name: g.name,
-    hint: g.hint,
-    tags: g.tags
-      .map((t) => ({ ...t, objects: (g.members[t.id] || []).filter((id) => objects[id]) }))
-      .filter((t) => t.objects.length)
-      .map((t) => ({ ...t, count: t.objects.length })),
-  }));
+function buildTagGroups(objects, defs) {
+  return defs
+    .map((g) => (g.derive ? DERIVED[g.derive](objects) : g))
+    .map((g) => ({
+      id: g.id,
+      name: g.name,
+      hint: g.hint,
+      tags: g.tags
+        .map((t) => ({ ...t, objects: (g.members[t.id] || []).filter((id) => objects[id]) }))
+        .filter((t) => t.objects.length)
+        .map((t) => ({ ...t, count: t.objects.length })),
+    }));
 }
 
 /** Reverse index: object id to the tags it carries, per group. */
@@ -2456,7 +2469,7 @@ function tagsByObject(groups) {
  * the bands gone from the nested view, this is what carries "these belong
  * together" at a glance.
  */
-const PLACE_COLOUR = Object.freeze({
+const DEVCON_PLACE_COLOUR = Object.freeze({
   venue: '#B8763A',
   cloud: '#3A7CB8',
   edge: '#17868C',
@@ -2465,22 +2478,865 @@ const PLACE_COLOUR = Object.freeze({
   thirdparty: '#7C8B93',
 });
 
-const PLACE_OF = (() => {
+/** Object id to its place, given one model's membership lists. */
+function placeIndex(members) {
   const out = {};
-  for (const [place, ids] of Object.entries(PLACE_MEMBERS)) for (const id of ids) out[id] = place;
-  return out;
-})();
-
-const placeOf = (id) => PLACE_OF[id] || null;
+  for (const [place, ids] of Object.entries(members)) for (const id of ids) out[id] = place;
+  return (id) => out[id] || null;
+}
 
 __exports.SCALE_GROUP = SCALE_GROUP;
 __exports.BLAST = BLAST;
-__exports.PLACE_COLOUR = PLACE_COLOUR;
-__exports.placeOf = placeOf;
+__exports.DEVCON_PLACE_MEMBERS = DEVCON_PLACE_MEMBERS;
+__exports.DEVCON_GROUP_DEFS = DEVCON_GROUP_DEFS;
+__exports.DEVCON_PLACE_COLOUR = DEVCON_PLACE_COLOUR;
 __exports.resilienceGroup = resilienceGroup;
 __exports.technologyGroup = technologyGroup;
 __exports.buildTagGroups = buildTagGroups;
 __exports.tagsByObject = tagsByObject;
+__exports.placeIndex = placeIndex;
+};
+
+__mods["model/mvp/objects.js"] = function (__exports, __req) {
+/* Objects: one entry per thing in the September 2026 MVP of the multi-brand
+   streaming platform. A second model rather than a revision of the Devcon 8
+   one: different scope, different brand, and a workshop rather than an event
+   as the thing it has to survive.
+
+   Every `scale.count` is read at one operating point: one brand, one stage,
+   about 500 concurrent viewers, which is the September pilot. Almost nothing
+   here is redundant and the model says so, because what is being tested this
+   month is whether the shape is right rather than whether it survives a bad
+   day. A rebuild is the recovery.
+
+   `scale` is required on every object and checked by the schema. See
+   ../scale.js for what the two enums mean and why they are not prose. */
+
+const { GROWS, RESILIENCE } = __req("model/scale.js");
+
+const MVP_OBJECTS = {
+  /* ── Context ── */
+  brand: { name: "Brand operator", type: "External actor", icon: "person", external: true,
+    tech: ["one brand"],
+    desc: "The customer's team. Creates streams, funds them, brands the player.",
+    scale: { count: "1", unit: "one brand in the September pilot", grows: GROWS.BRANDS, resilience: RESILIENCE.EXTERNAL,
+      onLoss: "Nothing of ours breaks. There is simply nobody asking for a stream that month." },
+    blurb: "One brand to begin with, though nothing in the model assumes it stays that way: the admin layer is multi-tenant from the first line. They own the encoder, the money and the look of the player, and we own everything between the SRT socket and the browser.",
+    note: "Which people inside a brand may create or stop a stream is undecided, which is why ownership is still an open question rather than a component." },
+
+  encoder: { name: "Brand's encoder", type: "External actor", icon: "stream", external: true,
+    tech: ["OBS", "SRT"],
+    desc: "OBS or a hardware encoder at their venue, one SRT feed per stage.",
+    scale: { count: "1", unit: "one encoder per stage", grows: GROWS.STAGES, resilience: RESILIENCE.EXTERNAL,
+      onLoss: "That stage has no picture, and nothing downstream can invent one." },
+    blurb: "Whatever the brand already owns, pointed at that stage's SRT endpoint with a passphrase we issue. One feed per stage, and in the pilot there is exactly one stage. The contribution spec is ours to write, and the keyframe interval is the part that decides whether segmenting is clean." },
+
+  viewers: { name: "Viewers", type: "External actor", icon: "person", external: true,
+    tech: ["browser"],
+    desc: "Browsers and phones, on the brand's own domain.",
+    scale: { count: "500", unit: "concurrent viewers in the pilot", grows: GROWS.VIEWERS, resilience: RESILIENCE.CLIENT,
+      onLoss: "One person cannot watch. It says nothing about anyone else." },
+    blurb: "About five hundred at once is what the pilot is sized for, which is small enough that delivery is not yet the interesting problem. They arrive on the brand's domain and never see ours.",
+    metrics: [["Pilot peak", "about 500", ""], ["Where they arrive", "the brand's domain", ""]] },
+
+  platform: { name: "Streaming platform", type: "Software system", icon: "system", drill: "containers",
+    tech: ["Swarm", "HLS"],
+    desc: "Ours. Ingest, publish to Swarm, and hand the brand a player.",
+    scale: { count: "1", unit: "one platform, multi-tenant from the start", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "Every brand is off air at once. In the pilot that is one brand on one stage, which is the only reason a single one is defensible." },
+    blurb: "Five containers: a stage host on GCP, the manager that deploys it, the Bee publishers on Vultr, a web2 admin layer, and the branded viewer SPA. That is the whole of the September MVP, and the claim this model makes is that nothing else is needed to put one brand on air.",
+    metrics: [["Containers", "5", ""], ["Brands", "1, of many", ""], ["Stages", "1", ""], ["Concurrent viewers", "about 500", ""]],
+    note: "The MVP is deliberately one of everything. Read the crimson dots as a decision rather than an oversight: a second copy of most of this would cost real money to prove a property nobody is testing this month." },
+
+  swarm: { name: "Swarm", type: "External system", icon: "net", external: true,
+    tech: ["Bee", "Gnosis"],
+    desc: "Origin, delivery and archive. Also the candidate chat transport.",
+    scale: { count: "1", unit: "one public network, nobody's to run", grows: GROWS.COVERAGE, resilience: RESILIENCE.EXTERNAL,
+      onLoss: "Retrieval slows or stops for everyone at once, and the gateway fallback is no help, because it reads from the same network." },
+    blurb: "Segments are pushed in by the publishers and pulled out by the viewer, either by a node running in their browser or through one of our gateways. Whether chat rides on it too, as feed updates or GSOC, is one of the questions this workshop has to settle." },
+
+  chain: { name: "Gnosis Chain", type: "External system", icon: "store", external: true,
+    tech: ["Gnosis", "xBZZ"],
+    desc: "Postage batches bought and cheques settled, in xBZZ.",
+    scale: { count: "1", unit: "one chain, shared by everyone on it", grows: GROWS.FIXED, resilience: RESILIENCE.EXTERNAL,
+      onLoss: "No new batches and no cheque settlement. Publishing carries on against the postage already bought, until it fills." },
+    blurb: "Everything that costs money happens here: buying a postage batch for a stream, topping it up before it fills, and settling the gateways' cheques. The admin layer is the only thing that talks to it, which keeps spend and keys in one place." },
+
+  /* ── Containers ── */
+  gcp: { name: "Streaming infra (GCP)", type: "Container", icon: "app", drill: "stagehost",
+    tech: ["Terraform", "SRS", "ffmpeg"],
+    desc: "One Terraform-built stage host: SRT in, ABR ladder, HLS out.",
+    scale: { count: "1", unit: "one host per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
+      onLoss: "That stage is off air until Terraform rebuilds the host; no other stage notices." },
+    blurb: "SRS terminates the SRT feed, ffmpeg encodes the ladder, the packager cuts two second segments and stream-uploader signs the feeds and pushes the chunks to the Bee publishers. One host holds all four, because at one stage there is nothing to gain by spreading them.",
+    metrics: [["Hosts per stage", "1", ""], ["Renditions", "4, or 1", ""], ["vCPU", "about 7", ""]],
+    note: "Terraform is what makes a single host acceptable. The recovery for losing one is applying the same definition again rather than repairing anything, which is a different bet from redundancy and a cheaper one at this size." },
+
+  sim: { name: "streaming-infra-manager", type: "Container", icon: "system", drill: "manager",
+    tech: ["Postgres", "docker compose"],
+    desc: "Deploys and operates the media stack, one stage at a time.",
+    scale: { count: "1", unit: "one manager for every stage", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "Streams already running keep running. Nothing new can be provisioned and nothing can be stopped cleanly." },
+    blurb: "Holds what a stage needs to come up: the media profile, whether that is the four rung ladder or a single rendition, the port slot, the list of Bee publishers, the signing key, the postage batch and the SRT passphrase. API, web UI and Postgres, applying a profile by running docker compose over ssh.",
+    note: "Today it runs on the stage host it deploys to, bound to loopback, which is why it has no authentication of its own. That holds while one machine is both the manager and the thing managed, and stops holding at the second stage." },
+
+  beehost: { name: "Bee host (Vultr)", type: "Container", icon: "store", drill: "beehost",
+    tech: ["Bee", "Vultr"],
+    desc: "The Bee publishers for each stream, and the public gateways.",
+    scale: { count: "1", unit: "one host, every stream on it", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
+      onLoss: "Publishing stops for every stream at once and the gateways go with it. Chunks already in Swarm are unaffected." },
+    blurb: "A publisher set per stream, four nodes for an ABR ladder and one for a single rendition, each holding the brand's postage and its own signing key. The public gateways sit on the same machine, which is convenient and also why a bad day takes both halves out together." },
+
+  admin: { name: "Web2 admin layer", type: "Container", icon: "shield", drill: "admin",
+    tech: ["Postgres", "REST"],
+    desc: "The brand console and the API behind it. Multi-tenant.",
+    scale: { count: "1", unit: "one admin layer for every brand", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "Streaming continues. Nobody can create a stream, top up a batch or change a logo until it is back." },
+    blurb: "Streams, stamps and cheques, branding and users, for every brand rather than one. It is the only thing that spends money and the only thing that talks to the chain, so it is also where ownership has to be decided." },
+
+  spa: { name: "Viewer SPA", type: "Container", icon: "app", drill: "spa",
+    tech: ["hls.js", "bee-js"],
+    desc: "The branded player. Starts a Bee node, falls back to a gateway.",
+    scale: { count: "500", unit: "one copy per viewer, on their device", grows: GROWS.VIEWERS, resilience: RESILIENCE.CLIENT,
+      onLoss: "One viewer's tab. Our capacity planning never sees it." },
+    blurb: "Loads the brand's theme and stream list, tries to start a Bee node in the browser and falls back to a gateway when it cannot. hls.js plays the ladder and switches rungs itself. Chat is drawn here because this is where it would live, not because it is decided." },
+
+  /* ── Stage host components ── */
+  srtin: { name: "SRT ingest (SRS)", type: "Component", icon: "stream",
+    tech: ["SRS", "SRT"],
+    desc: "Terminates SRT and checks the passphrase.",
+    scale: { count: "1", unit: "one endpoint per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
+      onLoss: "That stage's encoder cannot connect, so there is no feed to publish." },
+    blurb: "SRS listens on this stage's port slot with its own passphrase, and an unknown stream id is refused outright. That is the whole of ingest authentication, and it is enough for a pilot on a host nobody advertises." },
+
+  ladder: { name: "ABR ladder (ffmpeg)", type: "Component", icon: "app",
+    tech: ["ffmpeg", "x264"],
+    desc: "Decodes the feed and encodes four rungs, or passes one through.",
+    scale: { count: "1", unit: "one ffmpeg set per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
+      onLoss: "That stage stops producing renditions, and every viewer on it stops with them." },
+    blurb: "The media profile decides whether this is a four rung ABR ladder or a single rendition passed straight through. The ladder is the part of the MVP that is genuinely new work, and it is also the only thing on the host that costs real CPU.",
+    metrics: [["Rungs", "4, or 1", ""], ["vCPU", "about 7", ""]],
+    note: "The CPU floor of the whole design: one ffmpeg per rung, about 7 vCPU for four rungs. Everything else on this host is doing I/O, which is why one machine per stage is enough and why the second stage needs a second machine." },
+
+  packager: { name: "HLS packager", type: "Component", icon: "queue",
+    tech: ["HLS", "2 s"],
+    desc: "Two second segments and playlists, cut on the keyframes.",
+    scale: { count: "1", unit: "one packager per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
+      onLoss: "Segments stop being written, so the feeds stop advancing and the player runs out of buffer." },
+    blurb: "Writes a master playlist and one variant playlist per rung, with two second segments cut on the encoder's keyframes. The uploader watches the output rather than being told about it, which keeps the two ends independent.",
+    metrics: [["Segment", "2 s", ""], ["Variants", "4, or 1", ""]] },
+
+  uploader: { name: "stream-uploader", type: "Component", icon: "gateway",
+    tech: ["stream-uploader", "Bee API"],
+    desc: "Signs the feeds, stamps the chunks, pushes them to the publishers.",
+    scale: { count: "1", unit: "one uploader per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
+      onLoss: "Publishing stops for that stage while segments carry on being written to disk, so the stream is not live and the gap is at least recoverable." },
+    blurb: "One process per stage, watching every rendition and handing each to its own Bee publisher over the Bee API. It holds the signing key and the stamp, which makes it the one component on the host that cannot simply be run twice." },
+
+  /* ── Manager components ── */
+  simweb: { name: "Manager UI", type: "Component", icon: "eye",
+    tech: ["web UI"],
+    desc: "The operator's view of what is deployed where.",
+    scale: { count: "1", unit: "one UI, on the manager", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "The API still answers. Whoever is operating a stage has to do it by hand." },
+    blurb: "Lists stages, the profile each one is running and whether its media stack is up. An operator tool rather than a customer surface, which is why it has never needed to look like anything." },
+
+  simapi: { name: "Manager API", type: "Component", icon: "app",
+    tech: ["REST"],
+    desc: "Provision, stop, and read back what a stage is running.",
+    scale: { count: "1", unit: "one API for every stage", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "Nothing can be provisioned or stopped. Running stages are untouched." },
+    blurb: "The admin layer calls this to bring a stream up: profile, port slot, publisher list, key, stamp and passphrase in, a running media stack out. It has no authentication of its own, which is only survivable because it listens on loopback.",
+    note: "One end of the open question about ownership. The moment the manager is not on the same host as the thing it deploys, this call has to be authenticated and attributed to a brand." },
+
+  simdb: { name: "Postgres", type: "Component", icon: "store",
+    tech: ["Postgres"],
+    desc: "What each stage was given, so it can be given it again.",
+    scale: { count: "1", unit: "one database on the manager", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "Running stages keep running, and nothing knows any more what they were built from." },
+    blurb: "Profiles, port slots, publisher lists and stamp references. Small, and the only durable state on the manager, which makes it the one thing here worth a backup." },
+
+  simdeploy: { name: "Deployer", type: "Component", icon: "system",
+    tech: ["docker compose", "ssh"],
+    desc: "Brings the media stack up and down over ssh.",
+    scale: { count: "1", unit: "one deployer, one host per stage", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "Nothing changes on any stage until it is back. Nothing that is already up goes down." },
+    blurb: "Applies a profile by running docker compose over ssh on the stage host. Today it runs on that same host and reaches it over loopback, which is the shortest honest version of a deployment tool and exactly right for one stage." },
+
+  /* ── Bee host components ── */
+  beepub: { name: "Bee publishers", type: "Component", icon: "store",
+    tech: ["Bee", "postage"],
+    desc: "A funded, signing node per rung. Four for a ladder, one otherwise.",
+    scale: { count: "4", unit: "one publisher per rung of the one ABR stream", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
+      onLoss: "That rung goes quiet, so viewers on it drop a rung rather than lose the stream." },
+    blurb: "Each publisher holds the brand's postage batch and a signing key, receives chunks from the uploader and updates the feed for its own rung. One per rung rather than one per stream, so a full batch costs a rung instead of the whole ladder.",
+    metrics: [["Publishers", "4 for ABR, 1 for single", ""], ["Feeds signed", "1 each", ""], ["Postage batch", "1 each", ""]] },
+
+  beegw: { name: "Bee gateways", type: "Component", icon: "gateway",
+    tech: ["Bee", "HTTPS"],
+    desc: "Public read endpoint for viewers whose own node cannot start.",
+    scale: { count: "2", unit: "two gateways, shared by every stream", grows: GROWS.FIXED, resilience: RESILIENCE.POOL,
+      onLoss: "One going down leaves the other carrying every fallback viewer. Losing both leaves only the viewers whose in-browser node started." },
+    blurb: "Plain HTTPS in front of Swarm for the viewers who cannot run a node: no WSS reachability, an unfriendly browser, or a phone. Two of them behind one name, because this is the one part of the read path that is cheap to make survivable.",
+    metrics: [["Gateways", "2", ""], ["Per brand or shared", "undecided", "open"]],
+    note: "Whether these are per brand or shared by all of them is a workshop question with a price on it: shared is two machines for everyone, per brand is two more for every brand we sign." },
+
+  beeops: { name: "Bee deployment", type: "Component", icon: "system",
+    tech: ["scripts", "ssh"],
+    desc: "How a publisher set is brought up for a stream. Scripts, today.",
+    scale: { count: "1", unit: "one way of doing it, run by hand", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "Nothing running is affected. A new stream cannot be given its publishers until someone repeats the steps." },
+    blurb: "Bringing up four funded, keyed Bee nodes for a stream is a handful of scripts and a person following them. Whether the manager should own this instead is one of the questions for the workshop, and it is the difference between a demo and something a brand can start on its own.",
+    metrics: [["Run by", "a person, today", ""], ["Via the manager", "undecided", "open"]] },
+
+  /* ── Viewer SPA components ── */
+  spaboot: { name: "Brand bootstrap", type: "Component", icon: "app",
+    tech: ["brand config"],
+    desc: "Fetches the brand's theme, stream list and gateway list.",
+    scale: { count: "500", unit: "one bootstrap per viewer", grows: GROWS.VIEWERS, resilience: RESILIENCE.CLIENT,
+      onLoss: "That viewer gets an unbranded page with nothing on it to play." },
+    blurb: "The first request the page makes. It decides what the player looks like, which streams exist and which gateways to fall back to, which makes it the only thing the admin layer has to reach into the browser to change." },
+
+  innode: { name: "In-browser Bee node", type: "Component", icon: "net",
+    tech: ["bee-js", "WASM"],
+    desc: "A light Bee node in the browser, fetching chunks directly.",
+    scale: { count: "500", unit: "one node per viewer, when it starts at all", grows: GROWS.VIEWERS, resilience: RESILIENCE.CLIENT,
+      onLoss: "That viewer falls back to a gateway and watches the same stream over HTTPS." },
+    blurb: "The claim worth demonstrating: the viewer retrieves from Swarm itself rather than from us. It needs WSS-reachable nodes and a browser willing to cooperate, so it is attempted rather than relied on." },
+
+  gwfallback: { name: "Gateway fallback", type: "Component", icon: "gateway",
+    tech: ["HTTPS"],
+    desc: "The path taken when the in-browser node cannot start.",
+    scale: { count: "500", unit: "one fallback per viewer", grows: GROWS.VIEWERS, resilience: RESILIENCE.CLIENT,
+      onLoss: "That viewer sees nothing, since the node is the thing that already failed. This is the second of two chances." },
+    blurb: "Notices that the node did not come up, for whatever reason, and points the player at a gateway instead. Most viewers will take this path in the pilot, and assuming otherwise would size the gateways wrong." },
+
+  abrplayer: { name: "ABR player", type: "Component", icon: "stream",
+    tech: ["hls.js"],
+    desc: "hls.js over the master playlist. Switches rungs by itself.",
+    scale: { count: "500", unit: "one player per viewer", grows: GROWS.VIEWERS, resilience: RESILIENCE.CLIENT,
+      onLoss: "One viewer's playback stops. Nothing else notices, and a reload fixes it." },
+    blurb: "Stock hls.js pointed at the master playlist and fed by whichever of the two paths is working. Rung switching comes with the library, which is the reason a ladder is worth publishing at all." },
+
+  chat: { name: "Chat", type: "Component", icon: "queue",
+    tech: ["Swarm feeds", "GSOC"],
+    desc: "Open. Over Swarm feeds or GSOC, or a web2 websocket.",
+    scale: { count: "500", unit: "one chat client per viewer", grows: GROWS.VIEWERS, resilience: RESILIENCE.CLIENT,
+      onLoss: "Viewers watch without talking to each other, which is a smaller loss than either transport is to build." },
+    blurb: "Two honest options and no decision. Swarm feeds or GSOC keep the platform in one piece and are slow and unproven for a conversation; a websocket in the web2 layer works today and puts a centralised dependency in the middle of a decentralised product.",
+    metrics: [["Transport", "undecided", "open"], ["In the MVP at all", "undecided", "open"]],
+    note: "Worth deciding in the workshop rather than during the build, because the two answers put the component in two different places: one is another service on the admin host, the other is another thing running in the browser." },
+
+  /* ── Admin components ── */
+  adminui: { name: "Brand console", type: "Component", icon: "eye",
+    tech: ["web UI"],
+    desc: "Where a brand creates a stream and watches it cost money.",
+    scale: { count: "1", unit: "one console for every brand", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "The API is unaffected and the brand has no way to reach it. Everything on air stays on air." },
+    blurb: "Streams, stamps, cheque balances and branding, scoped to whichever brand is logged in. It is the only surface the customer touches, so it is also where multi-tenancy either holds or is obviously broken." },
+
+  adminapi: { name: "Admin API", type: "Component", icon: "app",
+    tech: ["REST"],
+    desc: "Every state change a brand can make, in one place.",
+    scale: { count: "1", unit: "one API for every brand", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "Nothing can be created, funded or changed. Whatever is running carries on running." },
+    blurb: "Calls the manager to provision a stream, the stamp manager to fund it, and the chain to buy a batch. Being the only writer is what makes ownership a tractable question: there is exactly one place to enforce it." },
+
+  admindb: { name: "Postgres", type: "Component", icon: "store",
+    tech: ["Postgres"],
+    desc: "Brands, users, streams, batches and branding.",
+    scale: { count: "1", unit: "one database, every brand in it", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "The console and the API stop answering. Streams already published stay published, because Swarm holds them rather than this." },
+    blurb: "The durable state of the whole platform, and the one row set that has to be right about which brand owns what. Small enough that a nightly dump is a real backup strategy rather than a gesture." },
+
+  auth: { name: "Authentication & ownership", type: "Component", icon: "shield",
+    tech: ["OIDC", "wallet"],
+    desc: "Open. Who may create and manage a brand's streams.",
+    scale: { count: "1", unit: "one answer needed, none chosen yet", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "Anyone who can reach the API can act as any brand, which is why this cannot ship undecided." },
+    blurb: "Three candidates and no decision: OIDC against something the brand already has, a wallet signature, or a magic link. It is a separate thread from this model, and it blocks the second brand rather than the first.",
+    metrics: [["Model", "undecided", "open"], ["Blocks", "the second brand", ""]],
+    note: "The pilot survives without it because there is one brand and one operator and both are us. Every path from here to two brands runs through this box." },
+
+  stampmgr: { name: "Stamps & cheques", type: "Component", icon: "queue",
+    tech: ["postage", "cheques"],
+    desc: "Buys batches, tops them up, and watches the gateways' cheques.",
+    scale: { count: "1", unit: "one manager over every batch and chequebook", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "Nothing for hours, then a batch fills and that rung publishes holes while every log line still says success." },
+    blurb: "Postage is the thing that quietly kills a Swarm stream, so this owns the whole lifecycle: buy, watch TTL and bucket utilisation, dilute before saturation, top up. It watches the gateways' cheque balances for the same reason, because an underfunded gateway degrades retrieval without ever failing.",
+    metrics: [["Batches watched", "1 per stream", ""], ["Dilute at", "85% utilisation", ""], ["Chequebook floor", "0.5 BZZ", ""]],
+    note: "Measured during the Devcon work, and the reason this is a component rather than a runbook step: an immutable batch filled hours earlier than predicted and kept publishing with holes, because only the fullest buckets refuse." },
+
+  branding: { name: "Branding", type: "Component", icon: "system",
+    tech: ["theme", "domain"],
+    desc: "Logo, colours and domain, turned into the SPA's config.",
+    scale: { count: "1", unit: "one theme per brand", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
+      onLoss: "The player falls back to an unbranded default, which for a white-label product is a visible failure rather than a cosmetic one." },
+    blurb: "The whole point of the product is that the viewer sees the brand and not us, so this is not decoration. It writes the config the bootstrap reads: theme, logo, stream list, and the domain the player is served from." }
+};
+
+__exports.MVP_OBJECTS = MVP_OBJECTS;
+};
+
+__mods["model/mvp/diagrams.js"] = function (__exports, __req) {
+/* Diagrams for the September MVP.
+ *
+ * Coordinates are read as a grid rather than as pixels: nodes sharing roughly
+ * an x become a column, nodes sharing roughly a y become a row, and the
+ * nested view sizes the tracks from whatever the cells contain, with fixed
+ * card sizes and a 78-unit gap between columns. Two consequences shape every
+ * diagram here. A label between two adjacent cards has about 14 characters of
+ * room before it lands on one of them, so labels are short and the sentence
+ * lives in the object's blurb. And an edge that has to cross a column passes
+ * over whatever sits in it, so the control plane is a row under the media
+ * path rather than a column beside it: every dashed edge is then adjacent or
+ * one row, and the one that is not (admin to SPA) runs through the gap the
+ * layout leaves between the two rows.
+ *
+ * Bands are validated, not drawn in the nested view, so they only document
+ * whose machine each card sits on. Every detail diagram repeats the externals
+ * it talks to for context; containment claims an object at the shallowest
+ * diagram that places it, so a repeat costs nothing and is the only way to
+ * draw an edge across branches.
+ */
+
+const MVP_DIAGRAMS = {
+  context: {
+    // Six boxes, and five of them are somebody else's. The whole of what we
+    // build is the one in the middle, which is the honest shape of an MVP.
+    // The brand is the left column: their encoder and their operator. The
+    // right column is the decentralised side the stream lands on: Swarm, the
+    // viewers reading from it, and the chain the postage is bought on.
+    name: "Streaming platform MVP", level: "Context", parent: null, w: 1250, h: 640,
+    nodes: [
+      { id: "encoder",  x: 20,  y: 120, w: 215, h: 140 },
+      { id: "brand",    x: 20,  y: 330, w: 215, h: 140 },
+      { id: "platform", x: 420, y: 230, w: 270, h: 185 },
+      { id: "swarm",    x: 820, y: 60,  w: 250, h: 150 },
+      { id: "viewers",  x: 820, y: 250, w: 250, h: 140 },
+      { id: "chain",    x: 820, y: 440, w: 250, h: 140 }
+    ],
+    edges: [
+      { from: "encoder",  to: "platform", label: "SRT per stage", strong: true },
+      { from: "brand",    to: "platform", label: "manages", kind: "control" },
+      { from: "platform", to: "chain",    label: "buys stamps", kind: "control" },
+      { from: "platform", to: "swarm",    label: "feeds + chunks", strong: true },
+      { from: "platform", to: "viewers",  label: "branded SPA", strong: true }
+    ]
+  },
+
+  containers: {
+    name: "Streaming platform", level: "Containers", parent: "context", of: "platform", w: 1500, h: 640,
+    // Two rows. The top one is the signal: stage host, Bee host, SPA, left to
+    // right. The bottom one is control: the manager under the stage host it
+    // deploys to, so "deploys" is one short vertical edge, and the admin layer
+    // under the Bee host, so it sits next to the SPA it configures and the
+    // chain it buys on lies straight ahead of it under the SPA. The SPA stands
+    // alone in its column and centres between the rows. The one edge that has
+    // to cross a card, the brand reaching the admin layer past the manager,
+    // is left to the router, which lifts it through the gap between the rows.
+    // The stamp relationship between the admin layer and the Bee host is drawn
+    // inside the Bee host rather than here, where it would only cross.
+    groups: [
+      { name: "Brand's side",   x: 14,  y: 40,  w: 232, h: 580, hint: "Their venue, their encoder, their money." },
+      { name: "GCP, per stage", x: 284, y: 40,  w: 262, h: 460, hint: "One Terraform-built host per stage, and the manager that runs on it." },
+      { name: "Vultr",          x: 584, y: 40,  w: 252, h: 190, hint: "Bee publishers per stream, and the public gateways." },
+      { name: "Web2",           x: 584, y: 310, w: 252, h: 190, hint: "Ordinary hosting. The only thing that spends money." },
+      { name: "Viewer",         x: 884, y: 175, w: 262, h: 190, hint: "Runs in the browser, on the brand's own domain." }
+    ],
+    nodes: [
+      { id: "gcp",     x: 300,  y: 60,  w: 230, h: 150 },
+      { id: "sim",     x: 300,  y: 330, w: 230, h: 150 },
+      { id: "beehost", x: 600,  y: 60,  w: 220, h: 150 },
+      { id: "admin",   x: 600,  y: 330, w: 220, h: 150 },
+      { id: "spa",     x: 900,  y: 195, w: 230, h: 150 },
+      { id: "encoder", x: 30,   y: 120, w: 200, h: 140 },
+      { id: "brand",   x: 30,   y: 330, w: 200, h: 140 },
+      { id: "swarm",   x: 1200, y: 60,  w: 220, h: 140 },
+      { id: "viewers", x: 1200, y: 250, w: 220, h: 130 },
+      { id: "chain",   x: 1200, y: 440, w: 220, h: 140 }
+    ],
+    edges: [
+      { from: "encoder", to: "gcp",     label: "SRT per stage", strong: true },
+      { from: "gcp",     to: "beehost", label: "stamped chunks", strong: true },
+      { from: "beehost", to: "swarm",   label: "pushsync", strong: true },
+      { from: "swarm",   to: "spa",     label: "chunks", strong: true },
+      { from: "beehost", to: "spa",     label: "HLS fallback", kind: "media" },
+      { from: "spa",     to: "viewers", label: "playback", strong: true },
+      { from: "brand",   to: "admin",   label: "manages", kind: "control" },
+      { from: "admin",   to: "sim",     label: "provision", kind: "control" },
+      { from: "sim",     to: "gcp",     label: "deploys", kind: "control" },
+      { from: "admin",   to: "chain",   label: "buys stamps", kind: "control" },
+      { from: "admin",   to: "spa",     label: "brand config", kind: "control" }
+    ]
+  },
+
+  stagehost: {
+    // One straight line, which is the point: everything that makes a stage
+    // work is four processes on one machine, in the order the video moves
+    // through them. The manager is drawn under the uploader because that is
+    // the component it configures rather than merely starts.
+    name: "Stage host", level: "Components", parent: "containers", of: "gcp", w: 1600, h: 560,
+    nodes: [
+      { id: "srtin",    x: 300,  y: 200, w: 200, h: 140 },
+      { id: "ladder",   x: 570,  y: 200, w: 200, h: 140 },
+      { id: "packager", x: 840,  y: 200, w: 200, h: 140 },
+      { id: "uploader", x: 1110, y: 200, w: 200, h: 140 },
+      { id: "encoder",  x: 30,   y: 200, w: 200, h: 140 },
+      { id: "sim",      x: 1110, y: 390, w: 200, h: 140 },
+      { id: "beehost",  x: 1380, y: 200, w: 200, h: 140 }
+    ],
+    edges: [
+      { from: "encoder",  to: "srtin",    label: "SRT", strong: true },
+      { from: "srtin",    to: "ladder",   label: "decoded feed", strong: true },
+      { from: "ladder",   to: "packager", label: "4 rungs, or 1", strong: true },
+      { from: "packager", to: "uploader", label: "2 s segments", strong: true },
+      { from: "uploader", to: "beehost",  label: "stamped chunks", strong: true },
+      { from: "sim",      to: "uploader", label: "profile", kind: "control" }
+    ]
+  },
+
+  manager: {
+    // The deployer is the only part of this that leaves the box, and today it
+    // leaves it over loopback, because the manager runs on the host it
+    // deploys to. That is why there is no authentication in this diagram.
+    // It sits on top so its one edge out, up to the stage host above this
+    // box, leaves through the top with nothing in the way.
+    name: "streaming-infra-manager", level: "Components", parent: "containers", of: "sim", w: 1360, h: 520,
+    nodes: [
+      { id: "simweb",    x: 300,  y: 200, w: 220, h: 140 },
+      { id: "simapi",    x: 570,  y: 200, w: 220, h: 140 },
+      { id: "simdeploy", x: 840,  y: 60,  w: 220, h: 140 },
+      { id: "simdb",     x: 840,  y: 340, w: 220, h: 140 },
+      { id: "admin",     x: 30,   y: 200, w: 220, h: 140 },
+      { id: "gcp",       x: 1110, y: 340, w: 220, h: 140 }
+    ],
+    edges: [
+      { from: "simweb",    to: "simapi",    label: "calls" },
+      { from: "simapi",    to: "simdb",     label: "state" },
+      { from: "simapi",    to: "simdeploy", label: "apply", kind: "control" },
+      { from: "simdeploy", to: "gcp",       label: "up / down", kind: "control" },
+      { from: "admin",     to: "simapi",    label: "provision", kind: "control" }
+    ]
+  },
+
+  beehost: {
+    // Two halves of one machine that have nothing to do with each other: the
+    // publishers write, the gateways read, and the only thing they share is
+    // the host and the bill. Whether that is a mistake is a workshop
+    // question, which is why the deployment of a publisher set is drawn as a
+    // box rather than left implied. The admin layer's money edges land here,
+    // on the two things that actually hold stamps and cheques, and since the
+    // admin layer sits under this box the publishers are drawn on the lower
+    // row so that edge arrives from below instead of through the deployment.
+    name: "Bee host (Vultr)", level: "Components", parent: "containers", of: "beehost", w: 1120, h: 520,
+    nodes: [
+      { id: "beeops", x: 300, y: 60,  w: 220, h: 150 },
+      { id: "beepub", x: 300, y: 300, w: 220, h: 150 },
+      { id: "beegw",  x: 570, y: 300, w: 220, h: 150 },
+      { id: "gcp",    x: 30,  y: 60,  w: 220, h: 140 },
+      { id: "admin",  x: 30,  y: 300, w: 220, h: 140 },
+      { id: "swarm",  x: 570, y: 60,  w: 220, h: 140 },
+      { id: "spa",    x: 840, y: 60,  w: 220, h: 150 }
+    ],
+    edges: [
+      { from: "gcp",    to: "beepub", label: "chunks", strong: true },
+      { from: "beepub", to: "swarm",  label: "pushsync", strong: true },
+      { from: "swarm",  to: "beegw",  label: "retrieval", strong: true },
+      { from: "beegw",  to: "spa",    label: "HLS", kind: "media" },
+      { from: "admin",  to: "beepub", label: "top up stamps", kind: "control" },
+      { from: "admin",  to: "beegw",  label: "cheques", kind: "control" },
+      { from: "beeops", to: "beepub", label: "per stream", kind: "control" }
+    ]
+  },
+
+  spa: {
+    // Two ways in and one player: chunks from Swarm through a node in the
+    // browser, and the same chunks over HTTPS from a gateway when that node
+    // will not start. The two sources sit one above the other with the player
+    // level between them, so both edges into it stay horizontal. The
+    // bootstrap is on the bottom row, level with the admin layer that feeds it
+    // config, and hands the fallback its gateway list; the node-first policy
+    // it enforces is written on the cards rather than drawn, because an edge
+    // two rows up would have to cross the fallback. Chat has no wire on purpose:
+    // whether it rides Swarm feeds or a web2 socket is the open question, and
+    // a card connected to nothing says so more honestly than a guessed edge.
+    name: "Viewer SPA", level: "Components", parent: "containers", of: "spa", w: 1120, h: 700,
+    nodes: [
+      { id: "innode",     x: 300, y: 60,  w: 220, h: 140 },
+      { id: "gwfallback", x: 300, y: 280, w: 220, h: 140 },
+      { id: "spaboot",    x: 300, y: 500, w: 220, h: 140 },
+      { id: "abrplayer",  x: 570, y: 60,  w: 220, h: 150 },
+      { id: "chat",       x: 570, y: 280, w: 220, h: 140 },
+      { id: "swarm",      x: 30,  y: 60,  w: 220, h: 140 },
+      { id: "beehost",    x: 30,  y: 280, w: 220, h: 140 },
+      { id: "admin",      x: 30,  y: 500, w: 220, h: 140 },
+      { id: "viewers",    x: 840, y: 60,  w: 220, h: 140 }
+    ],
+    edges: [
+      { from: "admin",      to: "spaboot",    label: "brand config", kind: "control" },
+      { from: "spaboot",    to: "gwfallback", label: "gateway list", kind: "control" },
+      { from: "swarm",      to: "innode",     label: "chunks", strong: true },
+      { from: "innode",     to: "abrplayer",  label: "segments", strong: true },
+      { from: "beehost",    to: "gwfallback", label: "HLS", kind: "media" },
+      { from: "gwfallback", to: "abrplayer",  label: "fallback", kind: "media" },
+      { from: "abrplayer",  to: "viewers",    label: "playback", strong: true }
+    ]
+  },
+
+  admin: {
+    // Console, API, database, and then three things that are each somebody
+    // else's problem to receive: the manager gets a stream, the chain and the
+    // Bee host get money, the SPA gets a look. Authentication is drawn beside
+    // the API rather than in front of the console, because the question is
+    // which brand a call may act for, not who may see a page. The manager is
+    // repeated as its API rather than as the whole box, so that with both
+    // opened the two levels draw one arrow between them, not two.
+    name: "Web2 admin layer", level: "Components", parent: "containers", of: "admin", w: 1390, h: 700,
+    nodes: [
+      { id: "adminui",  x: 300,  y: 60,  w: 220, h: 140 },
+      { id: "auth",     x: 300,  y: 280, w: 220, h: 150 },
+      { id: "adminapi", x: 570,  y: 60,  w: 220, h: 140 },
+      { id: "admindb",  x: 570,  y: 280, w: 220, h: 140 },
+      { id: "stampmgr", x: 840,  y: 60,  w: 230, h: 150 },
+      { id: "branding", x: 840,  y: 500, w: 230, h: 140 },
+      { id: "brand",    x: 30,   y: 60,  w: 220, h: 140 },
+      { id: "simapi",   x: 840,  y: 280, w: 230, h: 140 },
+      { id: "beehost",  x: 1120, y: 60,  w: 230, h: 140 },
+      { id: "chain",    x: 1120, y: 280, w: 230, h: 140 },
+      { id: "spa",      x: 1120, y: 500, w: 230, h: 140 }
+    ],
+    edges: [
+      { from: "brand",    to: "adminui",  label: "logs in", kind: "control" },
+      { from: "adminui",  to: "adminapi", label: "calls" },
+      { from: "adminapi", to: "admindb",  label: "state" },
+      { from: "auth",     to: "adminapi", label: "authorises", kind: "control" },
+      { from: "adminapi", to: "simapi",   label: "provision", kind: "control" },
+      { from: "stampmgr", to: "beehost",  label: "top up, TTL", kind: "control" },
+      { from: "stampmgr", to: "chain",    label: "buys batches", kind: "control" },
+      { from: "branding", to: "spa",      label: "theme, domain", kind: "control" }
+    ]
+  }
+};
+
+__exports.MVP_DIAGRAMS = MVP_DIAGRAMS;
+};
+
+__mods["model/mvp/tour.js"] = function (__exports, __req) {
+/**
+ * One pass over the MVP, in the order it makes sense to hear it in a room.
+ *
+ * The first seven steps are what ships. The last three are the arguments the
+ * workshop is there to have, which is why they end on an overlay rather than
+ * on a component: the answer is a colour across the whole diagram, not a box.
+ *
+ * Each step declares the exact set of boxes it wants open, so a step can
+ * close what the last one opened rather than only ever accumulating.
+ */
+
+const MVP_TOUR = {
+  name: "The MVP, in ten steps",
+  about: "The September pilot of the multi-brand platform: what ships, what is still an open question, and what the second brand would cost.",
+  steps: [
+    {
+      title: "One month, one brand, one stage",
+      text: "A brand pushes one SRT feed, we publish an ABR ladder to Swarm, and their viewers watch it in a player carrying their name. That is the whole of September, at about five hundred concurrent viewers. Everything else in this model is a decision this workshop is here to make.",
+      open: [], focus: null,
+    },
+    {
+      title: "The brand brings the feed",
+      text: "OBS or a hardware encoder at their venue, one SRT endpoint per stage, on a passphrase we issue. The contribution spec is ours to write, and the keyframe interval is the part that matters, because it is what lets segments be cut cleanly at two seconds. Nothing on the far side of that socket is ours.",
+      open: [], focus: ["encoder", "platform"], light: ["encoder", "platform"], edge: "encoder>platform",
+    },
+    {
+      title: "Per stage on GCP, per stream on Vultr",
+      text: "Two machines and a clean split. One Terraform-built host per stage does ingest, the ladder, packaging and the upload; one Vultr host holds the Bee publishers that own the postage and the signing keys. Losing either takes the stream off air, and the recovery is applying the definition again rather than failing over to anything.",
+      open: ["platform"], focus: ["gcp", "beehost"], light: ["gcp", "beehost", "sim"], edge: "gcp>beehost",
+    },
+    {
+      title: "Publishers and gateways",
+      text: "Four publishers for a four rung ladder, one per rung, each with its own feed, key and postage batch, so a full batch costs a rung instead of the stream. The gateways are the other half of the same machine and have nothing to do with publishing: they are how a viewer reads when their own node will not start. Whether they belong to one brand or to all of them is undecided.",
+      open: ["platform", "beehost"], focus: ["beepub", "beegw"], light: ["beepub", "beegw", "swarm"], edge: "beepub>swarm",
+    },
+    {
+      title: "Watching: node first, gateway second",
+      text: "The SPA tries to start a Bee node in the browser and fetch chunks from Swarm directly, which is the claim the whole product rests on. When that fails, and in the pilot it often will, it falls back to a gateway over plain HTTPS and the player never learns the difference. hls.js switches rungs off the master playlist either way, which is the one part of ABR that comes for free.",
+      open: ["platform", "spa"], focus: ["innode", "abrplayer"],
+      light: ["spa", "innode", "gwfallback", "abrplayer"], edge: "innode>abrplayer",
+    },
+    {
+      title: "Who pays, and how we know it is paid",
+      text: "Postage is what quietly kills a Swarm stream: a full batch keeps publishing holes while every log line still says success. So one component buys the batch, watches its TTL and bucket utilisation, dilutes before saturation, and watches the gateways' cheque balances for the same reason. It is the only thing here that spends money and the only thing that talks to the chain.",
+      open: ["platform", "admin"], focus: ["stampmgr", "chain"],
+      light: ["stampmgr", "chain", "beehost"], edge: "stampmgr>chain",
+    },
+    {
+      title: "Operating it",
+      text: "Nothing on the stage host is configured by hand. The manager holds the media profile, the port slot, the publisher list, the signing key, the stamp and the SRT passphrase, and applies them by running docker compose over ssh. Today it runs on the host it deploys to and reaches it over loopback, which is why it has no authentication of its own, and why a second stage is the thing that changes that.",
+      open: ["platform"], focus: ["admin", "sim"], light: ["admin", "sim", "gcp"], edge: "admin>sim",
+    },
+    {
+      title: "Open: who owns a stream",
+      text: "Three candidates and no decision: OIDC against something the brand already has, a wallet signature, or a magic link. It is not one box either, because the admin API and the manager API both have to know which brand a call may act for. The pilot survives without it since there is one brand and one operator and both are us, and every path to a second brand runs through here.",
+      open: ["platform", "admin"], focus: "auth", light: ["auth", "adminui", "adminapi"], overlay: "scope",
+    },
+    {
+      title: "Open: chat",
+      text: "Swarm feeds or GSOC keep the whole product on one network, and are slow and unproven for a conversation. A websocket in the web2 layer works today and puts a centralised dependency in the middle of a decentralised product. Worth deciding here rather than during the build, because the two answers put the component in two different places.",
+      open: ["platform", "spa"], focus: "chat", light: ["chat", "abrplayer", "swarm"], overlay: "scope",
+    },
+    {
+      title: "Per brand or shared",
+      text: "With this on, the cost of the second brand reads straight off the diagram. Teal is another machine or another process every time we sign someone, violet is built once and paid for once, and amber is the argument still to have. Everything the viewer touches is per brand whether we like it or not, which is the half of the bill nobody argues about.",
+      open: ["platform"], focus: null, overlay: "tenancy",
+    },
+  ],
+};
+
+__exports.MVP_TOUR = MVP_TOUR;
+};
+
+__mods["model/mvp/tags.js"] = function (__exports, __req) {
+/* Overlay groups for the MVP model.
+ *
+ * The two questions this workshop exists to answer come first, because they
+ * are the ones people disagree about: what actually ships this month, and
+ * which of these boxes is per brand rather than shared by all of them. The
+ * feature overlay is there to settle the first one honestly, by showing that
+ * a feature is never one box.
+ *
+ * Membership is listed here rather than as a field on each object, so the
+ * whole answer to "what is undecided" is readable in one place. The two
+ * derived groups at the end come from the objects themselves.
+ *
+ * Colours are the same wheel the Devcon model uses. Amber and crimson are
+ * kept off anything claimed for this month, so they read as "not settled"
+ * wherever they appear rather than as one more category.
+ */
+
+/** Everything not named as open or deferred. Enumerated, so a new object
+ *  without a scope shows up as a hole in the overlay rather than passing as
+ *  shipped by default. */
+const SHIP = [
+  'brand', 'encoder', 'viewers', 'platform', 'swarm', 'chain',
+  'gcp', 'sim', 'beehost', 'admin', 'spa',
+  'srtin', 'ladder', 'packager', 'uploader',
+  'simweb', 'simapi', 'simdb', 'simdeploy',
+  'beepub',
+  'spaboot', 'innode', 'gwfallback', 'abrplayer',
+  'adminui', 'adminapi', 'admindb', 'stampmgr', 'branding',
+];
+
+const SCOPE_MEMBERS = {
+  ship: SHIP,
+  // Four boxes, four different kinds of undecided: who owns a stream, whether
+  // chat is in at all, whether a publisher set is brought up by hand or by the
+  // manager, and whether the gateways are per brand or shared.
+  open: ['auth', 'chat', 'beeops', 'beegw'],
+  // Deliberately empty. The workshop fills it, and until it does there is
+  // nothing here to point at and call a phase two.
+  later: [],
+};
+
+const FEATURE_MEMBERS = {
+  'abr-stream': ['encoder', 'gcp', 'srtin', 'ladder', 'packager', 'uploader', 'beepub', 'sim'],
+  'abr-watch': ['spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'beegw', 'swarm'],
+  branding: ['branding', 'spaboot', 'adminui'],
+  stamps: ['stampmgr', 'beepub', 'beegw', 'chain'],
+  auth: ['auth', 'adminapi', 'simapi'],
+  chat: ['chat'],
+};
+
+const TENANCY_MEMBERS = {
+  perbrand: ['encoder', 'brand', 'gcp', 'srtin', 'ladder', 'packager', 'uploader', 'beepub',
+    'spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'branding', 'stampmgr'],
+  shared: ['admin', 'adminui', 'adminapi', 'admindb', 'auth', 'sim', 'simweb', 'simapi',
+    'simdb', 'simdeploy', 'beehost', 'beeops', 'platform'],
+  tbd: ['beegw', 'chat'],
+};
+
+/** Where each thing runs. Also the always-on card colour for this model. */
+const MVP_PLACE_MEMBERS = {
+  gcp: ['gcp', 'srtin', 'ladder', 'packager', 'uploader', 'sim', 'simweb', 'simapi', 'simdb', 'simdeploy'],
+  vultr: ['beehost', 'beepub', 'beegw', 'beeops'],
+  web2: ['admin', 'adminui', 'adminapi', 'admindb', 'auth', 'stampmgr', 'branding', 'platform'],
+  browser: ['spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'chat', 'viewers'],
+  brandside: ['encoder', 'brand'],
+  swarm: ['swarm'],
+  chain: ['chain'],
+};
+
+const MVP_PLACE_COLOUR = Object.freeze({
+  gcp: '#3A7CB8',
+  vultr: '#17868C',
+  web2: '#8465B8',
+  browser: '#2E8B63',
+  brandside: '#B8763A',
+  swarm: '#B07A22',
+  chain: '#7C8B93',
+});
+
+/**
+ * The overlay bar, in this order. A `derive` entry is filled in from the
+ * objects rather than listed: scale and redundancy comes from each object's
+ * own `scale`, technology from its tech list.
+ */
+const MVP_GROUP_DEFS = [
+  {
+    id: 'scope',
+    name: 'MVP scope',
+    hint: 'What ships this month, what is undecided, what waits.',
+    tags: [
+      { id: 'ship', name: 'Ship this month', color: '#2E8B63',
+        hint: 'In scope for September. Twenty-nine boxes, and one brand on air.' },
+      { id: 'open', name: 'Open question', color: '#B07A22',
+        hint: 'Drawn because it has to exist, not because it is decided.' },
+      { id: 'later', name: 'After the MVP', color: '#7C8B93',
+        hint: 'Nothing yet. This is the list the workshop is here to write.' },
+    ],
+    members: SCOPE_MEMBERS,
+  },
+  {
+    id: 'feature',
+    name: 'Feature',
+    hint: 'Which boxes each of the six features lives in.',
+    tags: [
+      { id: 'abr-stream', name: 'ABR streaming', color: '#3A7CB8',
+        hint: 'One SRT feed in, four rungs published. The new work.' },
+      { id: 'abr-watch', name: 'ABR watching', color: '#17868C',
+        hint: 'Node first, gateway second, rung switching for free.' },
+      { id: 'branding', name: 'Branding', color: '#8465B8',
+        hint: 'The viewer sees the brand and not us. Three boxes.' },
+      { id: 'stamps', name: 'Stamps & cheques', color: '#4E8C4E',
+        hint: 'The only part of this that spends money.' },
+      { id: 'auth', name: 'Auth & ownership', color: '#B07A22',
+        hint: 'Undecided, and it touches both APIs rather than one box.' },
+      { id: 'chat', name: 'Chat', color: '#A33F5E',
+        hint: 'One box today, and two entirely different builds behind it.' },
+    ],
+    members: FEATURE_MEMBERS,
+  },
+  {
+    id: 'tenancy',
+    name: 'Tenancy',
+    hint: 'Per brand, shared by every brand, or not yet decided.',
+    tags: [
+      { id: 'perbrand', name: 'Per brand', color: '#17868C',
+        hint: 'One of these for every brand we sign. The cost of the second brand.' },
+      { id: 'shared', name: 'Shared', color: '#8465B8',
+        hint: 'Built once, multi-tenant, and paid for once.' },
+      { id: 'tbd', name: 'Undecided', color: '#B07A22',
+        hint: 'Cheap shared, honest per brand. Both have been argued for.' },
+    ],
+    members: TENANCY_MEMBERS,
+  },
+  {
+    id: 'place',
+    name: 'Where it runs',
+    hint: 'Which machine and whose account each piece sits on.',
+    tags: [
+      { id: 'gcp', name: 'GCP, per stage', color: MVP_PLACE_COLOUR.gcp,
+        hint: 'One Terraform-built host per stage, with the manager on it.' },
+      { id: 'vultr', name: 'Vultr', color: MVP_PLACE_COLOUR.vultr, hint: 'One host, publishers and gateways together.' },
+      { id: 'web2', name: 'Web2 host', color: MVP_PLACE_COLOUR.web2, hint: 'Ordinary hosting, and the only thing that spends.' },
+      { id: 'browser', name: "Viewer's browser", color: MVP_PLACE_COLOUR.browser, hint: 'Runs on their device, so it fails for one person.' },
+      { id: 'brandside', name: "Brand's side", color: MVP_PLACE_COLOUR.brandside, hint: 'Their venue and their encoder.' },
+      { id: 'swarm', name: 'Swarm', color: MVP_PLACE_COLOUR.swarm, hint: 'The public network. Nobody runs it, including us.' },
+      { id: 'chain', name: 'Gnosis Chain', color: MVP_PLACE_COLOUR.chain, hint: 'Where the postage and the cheques settle.' },
+    ],
+    members: MVP_PLACE_MEMBERS,
+  },
+  { derive: 'scale' },
+  { derive: 'tech' },
+];
+
+__exports.MVP_PLACE_MEMBERS = MVP_PLACE_MEMBERS;
+__exports.MVP_PLACE_COLOUR = MVP_PLACE_COLOUR;
+__exports.MVP_GROUP_DEFS = MVP_GROUP_DEFS;
+};
+
+__mods["model/select.js"] = function (__exports, __req) {
+/**
+ * Which model the page is showing.
+ *
+ * Two independent models live in this tree and in the one built file: the
+ * Devcon 8 streaming architecture, which is the default and the reason the
+ * explorer exists, and the September MVP of the multi-brand platform. A model
+ * is its three literals plus its overlay definitions, and nothing outside
+ * this file has to know there is more than one.
+ *
+ * The choice is made once, synchronously, at module evaluation, from
+ * `?model=` on the URL. It has to be synchronous because every derived index
+ * downstream is a module-level constant, and it has to survive there being no
+ * DOM at all, because the tests and the bundler evaluate this in Node.
+ */
+
+const { OBJECTS } = __req("model/objects.js");
+const { DIAGRAMS } = __req("model/diagrams.js");
+const { TOUR } = __req("model/tour.js");
+const { DEVCON_GROUP_DEFS, DEVCON_PLACE_MEMBERS, DEVCON_PLACE_COLOUR } = __req("model/tags.js");
+const { MVP_OBJECTS } = __req("model/mvp/objects.js");
+const { MVP_DIAGRAMS } = __req("model/mvp/diagrams.js");
+const { MVP_TOUR } = __req("model/mvp/tour.js");
+const { MVP_GROUP_DEFS, MVP_PLACE_MEMBERS, MVP_PLACE_COLOUR } = __req("model/mvp/tags.js");
+
+/** The model asked for by a link, when it is not the default. */
+const MVP_MODEL = 'mvp';
+
+const DEFAULT_MODEL = 'devcon8';
+
+/**
+ * Every model, keyed by what a link calls it.
+ *
+ * `mark` is the two or three characters in the rail, and `open` is what is
+ * open on arrival, which for both models is the one system worth being inside
+ * rather than looking at.
+ */
+const MODELS = {
+  [DEFAULT_MODEL]: {
+    id: DEFAULT_MODEL,
+    mark: 'D8',
+    objects: OBJECTS,
+    diagrams: DIAGRAMS,
+    tour: TOUR,
+    groups: DEVCON_GROUP_DEFS,
+    places: DEVCON_PLACE_MEMBERS,
+    placeColour: DEVCON_PLACE_COLOUR,
+    open: ['sys'],
+  },
+  [MVP_MODEL]: {
+    id: MVP_MODEL,
+    mark: 'MVP',
+    objects: MVP_OBJECTS,
+    diagrams: MVP_DIAGRAMS,
+    tour: MVP_TOUR,
+    groups: MVP_GROUP_DEFS,
+    places: MVP_PLACE_MEMBERS,
+    placeColour: MVP_PLACE_COLOUR,
+    open: ['platform'],
+  },
+};
+
+/**
+ * The model a query string asks for. Anything unknown is the default rather
+ * than an error, the same way the store ignores query keys it does not know:
+ * a mistyped link should show the usual thing, not a blank page.
+ */
+function modelFrom(search) {
+  const asked = new URLSearchParams(search || '').get('model');
+  return asked && MODELS[asked] ? asked : DEFAULT_MODEL;
+}
+
+const MODEL_ID = modelFrom(typeof location === 'undefined' ? '' : location.search);
+
+const MODEL = MODELS[MODEL_ID];
+
+__exports.MVP_MODEL = MVP_MODEL;
+__exports.DEFAULT_MODEL = DEFAULT_MODEL;
+__exports.MODELS = MODELS;
+__exports.MODEL_ID = MODEL_ID;
+__exports.MODEL = MODEL;
+__exports.modelFrom = modelFrom;
 };
 
 __mods["model/schema.js"] = function (__exports, __req) {
@@ -2731,13 +3587,20 @@ __mods["model/index.js"] = function (__exports, __req) {
  *
  * Everything here is derived. The three literals stay the single source of
  * truth, so replacing them replaces the content without touching a view.
+ *
+ * Which set of literals arrives is ./select.js's business. The derivations
+ * below take the model they read as an optional argument defaulting to the
+ * active one, so the same functions can answer the same questions about a
+ * model that is not on screen, which is how the second model is tested.
  */
 
-const { OBJECTS } = __req("model/objects.js");
-const { DIAGRAMS } = __req("model/diagrams.js");
-const { TOUR } = __req("model/tour.js");
-const { buildTagGroups, tagsByObject } = __req("model/tags.js");
+const { MODEL } = __req("model/select.js");
+const { buildTagGroups, tagsByObject, placeIndex } = __req("model/tags.js");
 const { validateModel, edgeKey } = __req("model/schema.js");
+
+const OBJECTS = MODEL.objects;
+const DIAGRAMS = MODEL.diagrams;
+const TOUR = MODEL.tour;
 
 for (const [id, d] of Object.entries(DIAGRAMS)) d.id = id;
 for (const [id, o] of Object.entries(OBJECTS)) o.id = id;
@@ -2745,52 +3608,69 @@ TOUR.steps.forEach((s, i) => { s.index = i; });
 
 const ROOT_DIAGRAM = 'context';
 
+/** What the chrome needs to name the model it is showing. */
+const MODEL_ID = MODEL.id;
+const MODEL_MARK = MODEL.mark;
+const ROOT_NAME = DIAGRAMS[ROOT_DIAGRAM].name;
+/** Open on arrival: the one system worth being inside rather than looking at. */
+const INITIAL_OPEN = MODEL.open;
+
 /** Diagram ids from the root down to `id`, inclusive. */
-function ancestry(diagramId) {
+function ancestry(diagramId, diagrams = DIAGRAMS) {
   const chain = [];
   let cursor = diagramId;
   const guard = new Set();
-  while (cursor && DIAGRAMS[cursor] && !guard.has(cursor)) {
+  while (cursor && diagrams[cursor] && !guard.has(cursor)) {
     guard.add(cursor);
     chain.unshift(cursor);
-    cursor = DIAGRAMS[cursor].parent;
+    cursor = diagrams[cursor].parent;
   }
   return chain;
 }
 
 /**
- * Nested containment, the shape the systems view draws.
+ * Nested containment, the shape the canvas draws.
  *
- * A child of X is an object placed in X's drill diagram that no ancestor
- * diagram already places. Without that second clause the external actors a
- * detail diagram repeats for context, Devcon AV and the viewers, would read
- * as living inside the system they merely talk to.
+ * An object is claimed by the shallowest diagram that places it, and between
+ * two diagrams at the same depth by whichever is drawn first. Everywhere else
+ * it appears it is context being repeated: without that, the external actors
+ * a detail diagram repeats, Devcon AV and the viewers, would read as living
+ * inside the system they merely talk to, and a component two branches both
+ * talk to would be drawn twice with two different parents.
+ *
+ * One claim set for the whole walk rather than one per branch, which is what
+ * makes that last case work, and it is the same rule schema.js validates the
+ * walkthrough against. Two rules here would mean a model that validates and
+ * still renders a box twice.
  */
-function containmentTree() {
-  const build = (diagramId, seenAbove) => {
-    const d = DIAGRAMS[diagramId];
-    if (!d) return [];
-    const seen = new Set(seenAbove);
-    for (const n of d.nodes) seen.add(n.id);
+function containmentTree(m = ACTIVE) {
+  const claimed = new Set();
 
-    return d.nodes
-      .filter((n) => !seenAbove.has(n.id))
-      .map((n) => {
-        const o = OBJECTS[n.id];
-        return {
-          id: n.id,
-          object: o,
-          diagram: diagramId,
-          children: o.drill ? build(o.drill, seen) : [],
-        };
-      });
+  const build = (diagramId) => {
+    const d = m.diagrams[diagramId];
+    if (!d) return [];
+
+    // The whole level is claimed before anything descends, so a sibling
+    // further down cannot take a node this one has already placed.
+    const fresh = d.nodes.filter((n) => !claimed.has(n.id));
+    for (const n of fresh) claimed.add(n.id);
+
+    return fresh.map((n) => {
+      const o = m.objects[n.id];
+      return {
+        id: n.id,
+        object: o,
+        diagram: diagramId,
+        children: o.drill ? build(o.drill) : [],
+      };
+    });
   };
 
   return {
     id: ROOT_DIAGRAM,
     object: null,
     diagram: ROOT_DIAGRAM,
-    children: build(ROOT_DIAGRAM, new Set()),
+    children: build(ROOT_DIAGRAM),
   };
 }
 
@@ -2807,9 +3687,9 @@ const flatten = (node, depth = 0, out = []) => {
  * objects connected at several levels of detail is one dependency, recorded
  * once with the places it shows up.
  */
-function connectionIndex() {
+function connectionIndex(m = ACTIVE) {
   const byPair = new Map();
-  for (const [did, d] of Object.entries(DIAGRAMS)) {
+  for (const [did, d] of Object.entries(m.diagrams)) {
     for (const e of d.edges) {
       const key = edgeKey(e.from, e.to);
       const entry = byPair.get(key) || { from: e.from, to: e.to, labels: [], diagrams: [], strong: false };
@@ -2851,8 +3731,8 @@ function downstreamOf(objectId, connections = CONNECTIONS, maxDepth = 4) {
 }
 
 /** Where in the walkthrough an object is talked about. */
-function tourStepsFor(objectId) {
-  return TOUR.steps.filter((s) => {
+function tourStepsFor(objectId, tour = TOUR) {
+  return tour.steps.filter((s) => {
     if (s.focus === objectId) return true;
     if (Array.isArray(s.focus) && s.focus.includes(objectId)) return true;
     if ((s.light || []).includes(objectId)) return true;
@@ -2882,13 +3762,13 @@ function searchIndex() {
 }
 
 /** Object id to its containing object id, from the containment tree. */
-function parentIndex() {
+function parentIndex(m = ACTIVE) {
   const parents = {};
   const walk = (list, parent) => list.forEach((n) => {
     parents[n.id] = parent;
     walk(n.children, n.id);
   });
-  walk(containmentTree().children, null);
+  walk(containmentTree(m).children, null);
   return parents;
 }
 
@@ -2943,12 +3823,12 @@ function revealsFinerEdge(c, boxId, objects = OBJECTS, diagrams = DIAGRAMS) {
  * by the ingest edge under that name, so opening the pipeline deleted the
  * arrow into it and drew no replacement.
  */
-function connectionsAmong(open) {
-  const visible = (id) => visibleStandIn(id, open) === id;
+function connectionsAmong(open, m = ACTIVE) {
+  const visible = (id) => visibleStandIn(id, open, m.parents) === id;
 
-  return CONNECTIONS.filter((c) => {
+  return m.connections.filter((c) => {
     if (!visible(c.from) || !visible(c.to)) return false;
-    return ![c.from, c.to].some((end) => open.has(end) && revealsFinerEdge(c, end));
+    return ![c.from, c.to].some((end) => open.has(end) && revealsFinerEdge(c, end, m.objects, m.diagrams));
   });
 }
 
@@ -2958,21 +3838,43 @@ function connectionsAmong(open) {
  * it repeats for context, so a card would claim eleven parts next to a tree
  * row saying eight.
  */
-function childCounts() {
+function childCounts(m = ACTIVE) {
   const counts = {};
   const walk = (list) => list.forEach((n) => {
     counts[n.id] = n.children.length;
     walk(n.children);
   });
-  walk(containmentTree().children);
+  walk(containmentTree(m).children);
   return counts;
 }
 
-const PARENTS = parentIndex();
-const CHILD_COUNTS = childCounts();
-const TAG_GROUPS = buildTagGroups(OBJECTS);
+/**
+ * One model's literals with the two indexes every question needs, so a model
+ * can be interrogated without being the one the page is showing.
+ */
+function indexModel(objects, diagrams) {
+  const literals = { objects, diagrams };
+  return {
+    objects,
+    diagrams,
+    parents: parentIndex(literals),
+    connections: connectionIndex(literals),
+  };
+}
+
+/** The model on screen, indexed. Every derivation above defaults to it. */
+const ACTIVE = indexModel(OBJECTS, DIAGRAMS);
+
+const PARENTS = ACTIVE.parents;
+const CONNECTIONS = ACTIVE.connections;
+const CHILD_COUNTS = childCounts(ACTIVE);
+const TAG_GROUPS = buildTagGroups(OBJECTS, MODEL.groups);
 const TAGS_BY_OBJECT = tagsByObject(TAG_GROUPS);
-const CONNECTIONS = connectionIndex();
+
+/** Where each thing runs, painted on every card all the time. Per model. */
+const PLACE_COLOUR = MODEL.placeColour;
+const placeOf = placeIndex(MODEL.places);
+
 const VALIDATION = validateModel({
   objects: OBJECTS,
   diagrams: DIAGRAMS,
@@ -2980,15 +3882,23 @@ const VALIDATION = validateModel({
   overlays: new Set(TAG_GROUPS.map((g) => g.id)),
 });
 
-
-
+__exports.OBJECTS = OBJECTS;
+__exports.DIAGRAMS = DIAGRAMS;
+__exports.TOUR = TOUR;
 __exports.ROOT_DIAGRAM = ROOT_DIAGRAM;
+__exports.MODEL_ID = MODEL_ID;
+__exports.MODEL_MARK = MODEL_MARK;
+__exports.ROOT_NAME = ROOT_NAME;
+__exports.INITIAL_OPEN = INITIAL_OPEN;
 __exports.flatten = flatten;
+__exports.ACTIVE = ACTIVE;
 __exports.PARENTS = PARENTS;
+__exports.CONNECTIONS = CONNECTIONS;
 __exports.CHILD_COUNTS = CHILD_COUNTS;
 __exports.TAG_GROUPS = TAG_GROUPS;
 __exports.TAGS_BY_OBJECT = TAGS_BY_OBJECT;
-__exports.CONNECTIONS = CONNECTIONS;
+__exports.PLACE_COLOUR = PLACE_COLOUR;
+__exports.placeOf = placeOf;
 __exports.VALIDATION = VALIDATION;
 __exports.ancestry = ancestry;
 __exports.containmentTree = containmentTree;
@@ -3003,9 +3913,7 @@ __exports.ancestorsOf = ancestorsOf;
 __exports.revealsFinerEdge = revealsFinerEdge;
 __exports.connectionsAmong = connectionsAmong;
 __exports.childCounts = childCounts;
-__exports.OBJECTS = OBJECTS;
-__exports.DIAGRAMS = DIAGRAMS;
-__exports.TOUR = TOUR;
+__exports.indexModel = indexModel;
 };
 
 __mods["state/store.js"] = function (__exports, __req) {
@@ -3036,12 +3944,41 @@ const INITIAL = Object.freeze({
   inspector: true,
 });
 
+/**
+ * Query keys that are not state and must survive every rewrite.
+ *
+ * `toSearch` builds the query from scratch, so anything it does not know
+ * about is dropped. `model` is chosen once at load and never changes, which
+ * means dropping it would silently switch models on the first click: the URL
+ * loses `?model=mvp`, and the next reload shows the default.
+ *
+ * Read once here, before the first rewrite, so it survives being read back
+ * out of a URL this file has already edited.
+ */
+const CARRIED = ['model'];
+
+const carried = (() => {
+  const params = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
+  const out = {};
+  for (const key of CARRIED) {
+    const value = params.get(key);
+    if (value) out[key] = value;
+  }
+  return out;
+})();
+
 const LIST_KEYS = new Set(['opened', 'solo', 'hidden']);
 const BOOL_KEYS = new Set(['playing', 'tree', 'inspector', 'touring']);
 const NUM_KEYS = new Set(['step']);
 
-function createStore(onChange) {
-  let state = { ...INITIAL, ...fromSearch(location.search) };
+/**
+ * @param {Function} onChange  called with the new state after every change
+ * @param {object} initial     per-model defaults, for the state the model
+ *                             decides rather than the reader: which box is
+ *                             open before anything has been clicked.
+ */
+function createStore(onChange, initial = {}) {
+  let state = { ...INITIAL, ...initial, ...fromSearch(location.search) };
   let frozen = false;
 
   const notify = () => { if (!frozen) onChange(state); };
@@ -3074,11 +4011,11 @@ function createStore(onChange) {
       return api.set({ [key]: next });
     },
 
-    reset: () => api.set({ ...INITIAL }),
+    reset: () => api.set({ ...INITIAL, ...initial }),
   };
 
   addEventListener('popstate', () => {
-    state = { ...INITIAL, ...fromSearch(location.search) };
+    state = { ...INITIAL, ...initial, ...fromSearch(location.search) };
     notify();
   });
 
@@ -3113,8 +4050,11 @@ function fromSearch(search) {
 }
 
 /** Serialise state, omitting anything still at its default. */
-function toSearch(state) {
+function toSearch(state, carry = carried) {
   const params = new URLSearchParams();
+  // First, so a shared link still opens with the model in front of the state
+  // that only makes sense inside it.
+  for (const [key, value] of Object.entries(carry)) if (value) params.set(key, value);
   for (const [key, value] of Object.entries(state)) {
     if (!(key in INITIAL) || key === 'playing') continue;
     const initial = INITIAL[key];
@@ -3639,7 +4579,7 @@ const {
 } = __req("geom/viewport.js");
 const { edgeGeometry, routedEdge, pathOf } = __req("geom/routing.js");
 const { icon, glyph, shapeOf } = __req("render/icons.js");
-const { PLACE_COLOUR, placeOf } = __req("model/tags.js");
+const { PLACE_COLOUR, placeOf } = __req("model/index.js");
 const { multiplicity, colourOf, resilienceName } = __req("model/scale.js");
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -4376,11 +5316,11 @@ __mods["ui/tree.js"] = function (__exports, __req) {
  * narrow widths: it becomes an overlay instead.
  */
 
-const { containmentTree, OBJECTS } = __req("model/index.js");
+const { containmentTree, OBJECTS, INITIAL_OPEN } = __req("model/index.js");
 const { icon, glyph } = __req("render/icons.js");
 
 function createTree(mount, { onSelect, onOpen }) {
-  const expanded = new Set(['sys']);
+  const expanded = new Set(INITIAL_OPEN);
 
   function render(state = {}) {
     mount.replaceChildren();
@@ -4898,7 +5838,7 @@ __mods["ui/chrome.js"] = function (__exports, __req) {
  * the command palette, the theme switch and the toast.
  */
 
-const { OBJECTS, ancestorsOf, searchIndex } = __req("model/index.js");
+const { OBJECTS, ancestorsOf, searchIndex, MODEL_MARK, ROOT_NAME } = __req("model/index.js");
 const { icon, glyph } = __req("render/icons.js");
 
 const THEME_KEY = 'arch-explorer-theme';
@@ -4919,8 +5859,8 @@ function createChrome(refs, handlers) {
 function buildRail(rail, { onExpandAll, onCollapseAll, onToggleTheme, onSearch }) {
   const mark = document.createElement('div');
   mark.className = 'rail-mark';
-  mark.textContent = 'D8';
-  mark.title = 'Devcon 8 streaming architecture';
+  mark.textContent = MODEL_MARK;
+  mark.title = `${ROOT_NAME} architecture`;
   rail.append(mark);
 
   rail.append(
@@ -4959,7 +5899,7 @@ function renderCrumbs(mount, state, { onSelect }) {
   mount.replaceChildren();
 
   if (!state.selected) {
-    mount.append(crumb('system', 'Devcon 8 streaming', true));
+    mount.append(crumb('system', ROOT_NAME, true));
     return;
   }
 
@@ -5163,7 +6103,8 @@ __mods["main.js"] = function (__exports, __req) {
  * becomes pixels.
  */
 
-const { OBJECTS, TOUR, VALIDATION, ancestorsOf, CHILD_COUNTS } = __req("model/index.js");
+const { OBJECTS, TOUR, VALIDATION, ancestorsOf, CHILD_COUNTS, MODEL_ID, ROOT_NAME, INITIAL_OPEN } = __req("model/index.js");
+const { DEFAULT_MODEL } = __req("model/select.js");
 const { createStore } = __req("state/store.js");
 const { createScene } = __req("render/scene.js");
 const { createExplorerView } = __req("views/explorer.js");
@@ -5179,6 +6120,11 @@ const { glyph } = __req("render/icons.js");
 if (!VALIDATION.ok) {
   console.error(`Model validation failed:\n${VALIDATION.errors.join('\n')}`);
 }
+
+// index.html's title names the default model, because that is what the file
+// is for and what a search engine should see. A second model has to say so
+// itself, or every tab claims to be the Devcon 8 one.
+if (MODEL_ID !== DEFAULT_MODEL) document.title = ROOT_NAME;
 
 const $ = (id) => document.getElementById(id);
 const refs = {
@@ -5197,7 +6143,7 @@ const refs = {
 const scene = createScene(refs.stage);
 const explorerView = createExplorerView(scene);
 
-const store = createStore(render);
+const store = createStore(render, { opened: INITIAL_OPEN });
 
 /* ── Navigation ───────────────────────────────────────────────────────── */
 
@@ -5469,7 +6415,7 @@ render(store.get());
 if (!store.get().touring && !store.get().selected) setTimeout(() => scene.fit(), 0);
 
 // Exposed so an end to end test can assert on real state rather than pixels.
-window.explorer = { store, scene, model: { OBJECTS, TOUR, VALIDATION } };
+window.explorer = { store, scene, model: { id: MODEL_ID, OBJECTS, TOUR, VALIDATION } };
 
 
 };

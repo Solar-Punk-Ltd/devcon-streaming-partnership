@@ -4,7 +4,8 @@
  * becomes pixels.
  */
 
-import { OBJECTS, TOUR, VALIDATION, ancestorsOf, CHILD_COUNTS } from './model/index.js';
+import { OBJECTS, TOUR, VALIDATION, ancestorsOf, CHILD_COUNTS, MODEL_ID, ROOT_NAME, INITIAL_OPEN } from './model/index.js';
+import { DEFAULT_MODEL } from './model/select.js';
 import { createStore } from './state/store.js';
 import { createScene } from './render/scene.js';
 import { createExplorerView } from './views/explorer.js';
@@ -20,6 +21,11 @@ import { glyph } from './render/icons.js';
 if (!VALIDATION.ok) {
   console.error(`Model validation failed:\n${VALIDATION.errors.join('\n')}`);
 }
+
+// index.html's title names the default model, because that is what the file
+// is for and what a search engine should see. A second model has to say so
+// itself, or every tab claims to be the Devcon 8 one.
+if (MODEL_ID !== DEFAULT_MODEL) document.title = ROOT_NAME;
 
 const $ = (id) => document.getElementById(id);
 const refs = {
@@ -38,7 +44,7 @@ const refs = {
 const scene = createScene(refs.stage);
 const explorerView = createExplorerView(scene);
 
-const store = createStore(render);
+const store = createStore(render, { opened: INITIAL_OPEN });
 
 /* ── Navigation ───────────────────────────────────────────────────────── */
 
@@ -310,4 +316,4 @@ render(store.get());
 if (!store.get().touring && !store.get().selected) setTimeout(() => scene.fit(), 0);
 
 // Exposed so an end to end test can assert on real state rather than pixels.
-window.explorer = { store, scene, model: { OBJECTS, TOUR, VALIDATION } };
+window.explorer = { store, scene, model: { id: MODEL_ID, OBJECTS, TOUR, VALIDATION } };
