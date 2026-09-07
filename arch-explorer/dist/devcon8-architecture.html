@@ -2548,36 +2548,22 @@ const MVP_OBJECTS = {
     metrics: [["Containers", "5", ""], ["Brands", "1, of many", ""], ["Stages", "1", ""], ["Concurrent viewers", "about 500", ""]],
     note: "The MVP is deliberately one of everything. Read the crimson dots as a decision rather than an oversight: a second copy of most of this would cost real money to prove a property nobody is testing this month." },
 
-  swarm: { name: "Swarm", type: "External system", icon: "net", external: true,
-    tech: ["Bee", "Gnosis"],
-    desc: "Origin, delivery and archive. Also the candidate chat transport.",
-    scale: { count: "1", unit: "one public network, nobody's to run", grows: GROWS.COVERAGE, resilience: RESILIENCE.EXTERNAL,
-      onLoss: "Retrieval slows or stops for everyone at once, and the gateway fallback is no help, because it reads from the same network." },
-    blurb: "Segments are pushed in by the publishers and pulled out by the viewer, either by a node running in their browser or through one of our gateways. Whether chat rides on it too, as feed updates or GSOC, is one of the questions this workshop has to settle." },
-
-  chain: { name: "Gnosis Chain", type: "External system", icon: "store", external: true,
-    tech: ["Gnosis", "xBZZ"],
-    desc: "Postage batches bought and cheques settled, in xBZZ.",
-    scale: { count: "1", unit: "one chain, shared by everyone on it", grows: GROWS.FIXED, resilience: RESILIENCE.EXTERNAL,
-      onLoss: "No new batches and no cheque settlement. Publishing carries on against the postage already bought, until it fills." },
-    blurb: "Everything that costs money happens here: buying a postage batch for a stream, topping it up before it fills, and settling the gateways' cheques. The admin layer is the only thing that talks to it, which keeps spend and keys in one place." },
-
   /* ── Containers ── */
   gcp: { name: "Streaming infra (GCP)", type: "Container", icon: "app", drill: "stagehost",
-    tech: ["Terraform", "SRS", "ffmpeg"],
+    tech: ["Terraform"],
     desc: "One Terraform-built stage host: SRT in, ABR ladder, HLS out.",
     scale: { count: "1", unit: "one host per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
       onLoss: "That stage is off air until Terraform rebuilds the host; no other stage notices." },
-    blurb: "SRS terminates the SRT feed, ffmpeg encodes the ladder, the packager cuts two second segments and stream-uploader signs the feeds and pushes the chunks to the Bee publishers. One host holds all four, because at one stage there is nothing to gain by spreading them.",
+    blurb: "The ingest terminates the SRT feed, the transcoder encodes the ladder, the packager cuts two second segments and the uploader signs the feeds and pushes the chunks to the Bee publishers. One host holds all four, because at one stage there is nothing to gain by spreading them.",
     metrics: [["Hosts per stage", "1", ""], ["Renditions", "4, or 1", ""], ["vCPU", "about 7", ""]],
     note: "Terraform is what makes a single host acceptable. The recovery for losing one is applying the same definition again rather than repairing anything, which is a different bet from redundancy and a cheaper one at this size." },
 
   sim: { name: "streaming-infra-manager", type: "Container", icon: "system", drill: "manager",
     tech: ["Postgres", "docker compose"],
-    desc: "Deploys and operates the media stack, one stage at a time.",
+    desc: "Deploys the media stack per stage, and owns the postage and cheques.",
     scale: { count: "1", unit: "one manager for every stage", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
       onLoss: "Streams already running keep running. Nothing new can be provisioned and nothing can be stopped cleanly." },
-    blurb: "Holds what a stage needs to come up: the media profile, whether that is the four rung ladder or a single rendition, the port slot, the list of Bee publishers, the signing key, the postage batch and the SRT passphrase. API, web UI and Postgres, applying a profile by running docker compose over ssh.",
+    blurb: "Holds what a stage needs to come up: the media profile, whether that is the four rung ladder or a single rendition, the port slot, the list of Bee publishers, the signing key, the postage batch and the SRT passphrase. API, web UI and Postgres, applying a profile by running docker compose over ssh. The postage batches and the gateways' chequebooks are managed here too, so funding a stream and starting it are one operation.",
     note: "Today it runs on the stage host it deploys to, bound to loopback, which is why it has no authentication of its own. That holds while one machine is both the manager and the thing managed, and stops holding at the second stage." },
 
   beehost: { name: "Bee host (Vultr)", type: "Container", icon: "store", drill: "beehost",
@@ -2592,7 +2578,7 @@ const MVP_OBJECTS = {
     desc: "The brand console and the API behind it. Multi-tenant.",
     scale: { count: "1", unit: "one admin layer for every brand", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
       onLoss: "Streaming continues. Nobody can create a stream, top up a batch or change a logo until it is back." },
-    blurb: "Streams, stamps and cheques, branding and users, for every brand rather than one. It is the only thing that spends money and the only thing that talks to the chain, so it is also where ownership has to be decided." },
+    blurb: "Streams, branding and users, for every brand rather than one. Anything that touches a host or a wallet it asks the manager to do, so this is where ownership has to be decided rather than where money moves." },
 
   spa: { name: "Viewer SPA", type: "Container", icon: "app", drill: "spa",
     tech: ["hls.js", "bee-js"],
@@ -2602,21 +2588,21 @@ const MVP_OBJECTS = {
     blurb: "Loads the brand's theme and stream list, tries to start a Bee node in the browser and falls back to a gateway when it cannot. hls.js plays the ladder and switches rungs itself. Chat is drawn here because this is where it would live, not because it is decided." },
 
   /* ── Stage host components ── */
-  srtin: { name: "SRT ingest (SRS)", type: "Component", icon: "stream",
-    tech: ["SRS", "SRT"],
+  srtin: { name: "SRT ingest", type: "Component", icon: "stream",
+    tech: ["SRT"],
     desc: "Terminates SRT and checks the passphrase.",
     scale: { count: "1", unit: "one endpoint per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
       onLoss: "That stage's encoder cannot connect, so there is no feed to publish." },
-    blurb: "SRS listens on this stage's port slot with its own passphrase, and an unknown stream id is refused outright. That is the whole of ingest authentication, and it is enough for a pilot on a host nobody advertises." },
+    blurb: "Listens on this stage's port slot with its own passphrase, and an unknown stream id is refused outright. That is the whole of ingest authentication, and it is enough for a pilot on a host nobody advertises." },
 
-  ladder: { name: "ABR ladder (ffmpeg)", type: "Component", icon: "app",
-    tech: ["ffmpeg", "x264"],
+  ladder: { name: "ABR ladder", type: "Component", icon: "app",
+    tech: ["H.264"],
     desc: "Decodes the feed and encodes four rungs, or passes one through.",
-    scale: { count: "1", unit: "one ffmpeg set per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
+    scale: { count: "1", unit: "one transcoder per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
       onLoss: "That stage stops producing renditions, and every viewer on it stops with them." },
     blurb: "The media profile decides whether this is a four rung ABR ladder or a single rendition passed straight through. The ladder is the part of the MVP that is genuinely new work, and it is also the only thing on the host that costs real CPU.",
     metrics: [["Rungs", "4, or 1", ""], ["vCPU", "about 7", ""]],
-    note: "The CPU floor of the whole design: one ffmpeg per rung, about 7 vCPU for four rungs. Everything else on this host is doing I/O, which is why one machine per stage is enough and why the second stage needs a second machine." },
+    note: "The CPU floor of the whole design: one encoder process per rung, about 7 vCPU for four rungs. Everything else on this host is doing I/O, which is why one machine per stage is enough and why the second stage needs a second machine." },
 
   packager: { name: "HLS packager", type: "Component", icon: "queue",
     tech: ["HLS", "2 s"],
@@ -2626,8 +2612,8 @@ const MVP_OBJECTS = {
     blurb: "Writes a master playlist and one variant playlist per rung, with two second segments cut on the encoder's keyframes. The uploader watches the output rather than being told about it, which keeps the two ends independent.",
     metrics: [["Segment", "2 s", ""], ["Variants", "4, or 1", ""]] },
 
-  uploader: { name: "stream-uploader", type: "Component", icon: "gateway",
-    tech: ["stream-uploader", "Bee API"],
+  uploader: { name: "Stream uploader", type: "Component", icon: "gateway",
+    tech: ["Bee API"],
     desc: "Signs the feeds, stamps the chunks, pushes them to the publishers.",
     scale: { count: "1", unit: "one uploader per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
       onLoss: "Publishing stops for that stage while segments carry on being written to disk, so the stream is not live and the gap is at least recoverable." },
@@ -2681,14 +2667,6 @@ const MVP_OBJECTS = {
     metrics: [["Gateways", "2", ""], ["Per brand or shared", "undecided", "open"]],
     note: "Whether these are per brand or shared by all of them is a workshop question with a price on it: shared is two machines for everyone, per brand is two more for every brand we sign." },
 
-  beeops: { name: "Bee deployment", type: "Component", icon: "system",
-    tech: ["scripts", "ssh"],
-    desc: "How a publisher set is brought up for a stream. Scripts, today.",
-    scale: { count: "1", unit: "one way of doing it, run by hand", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
-      onLoss: "Nothing running is affected. A new stream cannot be given its publishers until someone repeats the steps." },
-    blurb: "Bringing up four funded, keyed Bee nodes for a stream is a handful of scripts and a person following them. Whether the manager should own this instead is one of the questions for the workshop, and it is the difference between a demo and something a brand can start on its own.",
-    metrics: [["Run by", "a person, today", ""], ["Via the manager", "undecided", "open"]] },
-
   /* ── Viewer SPA components ── */
   spaboot: { name: "Brand bootstrap", type: "Component", icon: "app",
     tech: ["brand config"],
@@ -2740,7 +2718,7 @@ const MVP_OBJECTS = {
     desc: "Every state change a brand can make, in one place.",
     scale: { count: "1", unit: "one API for every brand", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
       onLoss: "Nothing can be created, funded or changed. Whatever is running carries on running." },
-    blurb: "Calls the manager to provision a stream, the stamp manager to fund it, and the chain to buy a batch. Being the only writer is what makes ownership a tractable question: there is exactly one place to enforce it." },
+    blurb: "Calls the manager to provision a stream and to fund it. Being the only writer is what makes ownership a tractable question: there is exactly one place to enforce it." },
 
   admindb: { name: "Postgres", type: "Component", icon: "store",
     tech: ["Postgres"],
@@ -2804,23 +2782,19 @@ const MVP_DIAGRAMS = {
   context: {
     // Six boxes, and five of them are somebody else's. The whole of what we
     // build is the one in the middle, which is the honest shape of an MVP.
-    // The brand is the left column: their encoder and their operator. The
-    // right column is the decentralised side the stream lands on: Swarm, the
-    // viewers reading from it, and the chain the postage is bought on.
+    // The brand is the left column: their encoder and their operator; the
+    // viewers are the right. Swarm and the chain are not boxes here: the
+    // network is what the platform publishes into, not a component of it.
     name: "Streaming platform MVP", level: "Context", parent: null, w: 1250, h: 640,
     nodes: [
       { id: "encoder",  x: 20,  y: 120, w: 215, h: 140 },
       { id: "brand",    x: 20,  y: 330, w: 215, h: 140 },
       { id: "platform", x: 420, y: 230, w: 270, h: 185 },
-      { id: "swarm",    x: 820, y: 60,  w: 250, h: 150 },
-      { id: "viewers",  x: 820, y: 250, w: 250, h: 140 },
-      { id: "chain",    x: 820, y: 440, w: 250, h: 140 }
+      { id: "viewers",  x: 820, y: 250, w: 250, h: 140 }
     ],
     edges: [
       { from: "encoder",  to: "platform", label: "SRT per stage", strong: true },
       { from: "brand",    to: "platform", label: "manages", kind: "control" },
-      { from: "platform", to: "chain",    label: "buys stamps", kind: "control" },
-      { from: "platform", to: "swarm",    label: "feeds + chunks", strong: true },
       { from: "platform", to: "viewers",  label: "branded SPA", strong: true }
     ]
   },
@@ -2830,8 +2804,7 @@ const MVP_DIAGRAMS = {
     // Two rows. The top one is the signal: stage host, Bee host, SPA, left to
     // right. The bottom one is control: the manager under the stage host it
     // deploys to, so "deploys" is one short vertical edge, and the admin layer
-    // under the Bee host, so it sits next to the SPA it configures and the
-    // chain it buys on lies straight ahead of it under the SPA. The SPA stands
+    // under the Bee host, so it sits next to the SPA it configures. The SPA stands
     // alone in its column and centres between the rows. The one edge that has
     // to cross a card, the brand reaching the admin layer past the manager,
     // is left to the router, which lifts it through the gap between the rows.
@@ -2852,21 +2825,16 @@ const MVP_DIAGRAMS = {
       { id: "spa",     x: 900,  y: 195, w: 230, h: 150 },
       { id: "encoder", x: 30,   y: 120, w: 200, h: 140 },
       { id: "brand",   x: 30,   y: 330, w: 200, h: 140 },
-      { id: "swarm",   x: 1200, y: 60,  w: 220, h: 140 },
-      { id: "viewers", x: 1200, y: 250, w: 220, h: 130 },
-      { id: "chain",   x: 1200, y: 440, w: 220, h: 140 }
+      { id: "viewers", x: 1200, y: 250, w: 220, h: 130 }
     ],
     edges: [
       { from: "encoder", to: "gcp",     label: "SRT per stage", strong: true },
       { from: "gcp",     to: "beehost", label: "stamped chunks", strong: true },
-      { from: "beehost", to: "swarm",   label: "pushsync", strong: true },
-      { from: "swarm",   to: "spa",     label: "chunks", strong: true },
-      { from: "beehost", to: "spa",     label: "HLS fallback", kind: "media" },
+      { from: "beehost", to: "spa",     label: "chunks or HLS", strong: true },
       { from: "spa",     to: "viewers", label: "playback", strong: true },
       { from: "brand",   to: "admin",   label: "manages", kind: "control" },
       { from: "admin",   to: "sim",     label: "provision", kind: "control" },
       { from: "sim",     to: "gcp",     label: "deploys", kind: "control" },
-      { from: "admin",   to: "chain",   label: "buys stamps", kind: "control" },
       { from: "admin",   to: "spa",     label: "brand config", kind: "control" }
     ]
   },
@@ -2897,25 +2865,34 @@ const MVP_DIAGRAMS = {
   },
 
   manager: {
-    // The deployer is the only part of this that leaves the box, and today it
-    // leaves it over loopback, because the manager runs on the host it
-    // deploys to. That is why there is no authentication in this diagram.
-    // It sits on top so its one edge out, up to the stage host above this
-    // box, leaves through the top with nothing in the way.
-    name: "streaming-infra-manager", level: "Components", parent: "containers", of: "sim", w: 1360, h: 520,
+    // The API is the hub, so it sits in the middle of its column with the
+    // deployer above it and the database below: both edges are one vertical
+    // hop. The deployer on top means its one edge out, up to the stage host
+    // above this box, leaves through the top with nothing in the way. The
+    // stamp and chequebook manager lives here rather than in the admin
+    // layer, because funding a stream and starting it are one operation from
+    // the brand's side; it is the only part of the manager that touches
+    // money, and its edge to the Bee host is the only one that leaves
+    // sideways. Today the manager runs on the host it deploys to over
+    // loopback, which is why there is no authentication in this diagram.
+    name: "streaming-infra-manager", level: "Components", parent: "containers", of: "sim", w: 1360, h: 700,
     nodes: [
-      { id: "simweb",    x: 300,  y: 200, w: 220, h: 140 },
-      { id: "simapi",    x: 570,  y: 200, w: 220, h: 140 },
-      { id: "simdeploy", x: 840,  y: 60,  w: 220, h: 140 },
-      { id: "simdb",     x: 840,  y: 340, w: 220, h: 140 },
-      { id: "admin",     x: 30,   y: 200, w: 220, h: 140 },
-      { id: "gcp",       x: 1110, y: 340, w: 220, h: 140 }
+      { id: "simweb",    x: 300,  y: 280, w: 220, h: 140 },
+      { id: "simdeploy", x: 570,  y: 60,  w: 220, h: 140 },
+      { id: "simapi",    x: 570,  y: 280, w: 220, h: 140 },
+      { id: "simdb",     x: 570,  y: 500, w: 220, h: 140 },
+      { id: "stampmgr",  x: 840,  y: 280, w: 230, h: 150 },
+      { id: "admin",     x: 30,   y: 280, w: 220, h: 140 },
+      { id: "gcp",       x: 1110, y: 60,  w: 220, h: 140 },
+      { id: "beehost",   x: 1110, y: 280, w: 220, h: 140 }
     ],
     edges: [
       { from: "simweb",    to: "simapi",    label: "calls" },
-      { from: "simapi",    to: "simdb",     label: "state" },
       { from: "simapi",    to: "simdeploy", label: "apply", kind: "control" },
+      { from: "simapi",    to: "simdb",     label: "state" },
+      { from: "simapi",    to: "stampmgr",  label: "fund", kind: "control" },
       { from: "simdeploy", to: "gcp",       label: "up / down", kind: "control" },
+      { from: "stampmgr",  to: "beehost",   label: "top up, TTL", kind: "control" },
       { from: "admin",     to: "simapi",    label: "provision", kind: "control" }
     ]
   },
@@ -2923,30 +2900,23 @@ const MVP_DIAGRAMS = {
   beehost: {
     // Two halves of one machine that have nothing to do with each other: the
     // publishers write, the gateways read, and the only thing they share is
-    // the host and the bill. Whether that is a mistake is a workshop
-    // question, which is why the deployment of a publisher set is drawn as a
-    // box rather than left implied. The admin layer's money edges land here,
-    // on the two things that actually hold stamps and cheques, and since the
-    // admin layer sits under this box the publishers are drawn on the lower
-    // row so that edge arrives from below instead of through the deployment.
+    // the host and the bill. Swarm sits between them and is not a box, so the
+    // one edge between the halves says so in its label. The admin layer's
+    // money edges land here, on the two things that hold stamps and cheques.
     name: "Bee host (Vultr)", level: "Components", parent: "containers", of: "beehost", w: 1120, h: 520,
     nodes: [
-      { id: "beeops", x: 300, y: 60,  w: 220, h: 150 },
       { id: "beepub", x: 300, y: 300, w: 220, h: 150 },
       { id: "beegw",  x: 570, y: 300, w: 220, h: 150 },
       { id: "gcp",    x: 30,  y: 60,  w: 220, h: 140 },
       { id: "admin",  x: 30,  y: 300, w: 220, h: 140 },
-      { id: "swarm",  x: 570, y: 60,  w: 220, h: 140 },
       { id: "spa",    x: 840, y: 60,  w: 220, h: 150 }
     ],
     edges: [
       { from: "gcp",    to: "beepub", label: "chunks", strong: true },
-      { from: "beepub", to: "swarm",  label: "pushsync", strong: true },
-      { from: "swarm",  to: "beegw",  label: "retrieval", strong: true },
+      { from: "beepub", to: "beegw",  label: "via Swarm", strong: true },
       { from: "beegw",  to: "spa",    label: "HLS", kind: "media" },
       { from: "admin",  to: "beepub", label: "top up stamps", kind: "control" },
-      { from: "admin",  to: "beegw",  label: "cheques", kind: "control" },
-      { from: "beeops", to: "beepub", label: "per stream", kind: "control" }
+      { from: "admin",  to: "beegw",  label: "cheques", kind: "control" }
     ]
   },
 
@@ -2968,7 +2938,6 @@ const MVP_DIAGRAMS = {
       { id: "spaboot",    x: 300, y: 500, w: 220, h: 140 },
       { id: "abrplayer",  x: 570, y: 60,  w: 220, h: 150 },
       { id: "chat",       x: 570, y: 280, w: 220, h: 140 },
-      { id: "swarm",      x: 30,  y: 60,  w: 220, h: 140 },
       { id: "beehost",    x: 30,  y: 280, w: 220, h: 140 },
       { id: "admin",      x: 30,  y: 500, w: 220, h: 140 },
       { id: "viewers",    x: 840, y: 60,  w: 220, h: 140 }
@@ -2976,7 +2945,7 @@ const MVP_DIAGRAMS = {
     edges: [
       { from: "admin",      to: "spaboot",    label: "brand config", kind: "control" },
       { from: "spaboot",    to: "gwfallback", label: "gateway list", kind: "control" },
-      { from: "swarm",      to: "innode",     label: "chunks", strong: true },
+      { from: "beehost",    to: "innode",     label: "via Swarm", strong: true },
       { from: "innode",     to: "abrplayer",  label: "segments", strong: true },
       { from: "beehost",    to: "gwfallback", label: "HLS", kind: "media" },
       { from: "gwfallback", to: "abrplayer",  label: "fallback", kind: "media" },
@@ -2985,9 +2954,9 @@ const MVP_DIAGRAMS = {
   },
 
   admin: {
-    // Console, API, database, and then three things that are each somebody
-    // else's problem to receive: the manager gets a stream, the chain and the
-    // Bee host get money, the SPA gets a look. Authentication is drawn beside
+    // Console, API, database, and then two things that are somebody else's
+    // problem to receive: the manager gets a stream and the money to fund it,
+    // the SPA gets a look. Nothing here touches a wallet. Authentication is drawn beside
     // the API rather than in front of the console, because the question is
     // which brand a call may act for, not who may see a page. The manager is
     // repeated as its API rather than as the whole box, so that with both
@@ -2998,12 +2967,9 @@ const MVP_DIAGRAMS = {
       { id: "auth",     x: 300,  y: 280, w: 220, h: 150 },
       { id: "adminapi", x: 570,  y: 60,  w: 220, h: 140 },
       { id: "admindb",  x: 570,  y: 280, w: 220, h: 140 },
-      { id: "stampmgr", x: 840,  y: 60,  w: 230, h: 150 },
       { id: "branding", x: 840,  y: 500, w: 230, h: 140 },
       { id: "brand",    x: 30,   y: 60,  w: 220, h: 140 },
       { id: "simapi",   x: 840,  y: 280, w: 230, h: 140 },
-      { id: "beehost",  x: 1120, y: 60,  w: 230, h: 140 },
-      { id: "chain",    x: 1120, y: 280, w: 230, h: 140 },
       { id: "spa",      x: 1120, y: 500, w: 230, h: 140 }
     ],
     edges: [
@@ -3012,8 +2978,6 @@ const MVP_DIAGRAMS = {
       { from: "adminapi", to: "admindb",  label: "state" },
       { from: "auth",     to: "adminapi", label: "authorises", kind: "control" },
       { from: "adminapi", to: "simapi",   label: "provision", kind: "control" },
-      { from: "stampmgr", to: "beehost",  label: "top up, TTL", kind: "control" },
-      { from: "stampmgr", to: "chain",    label: "buys batches", kind: "control" },
       { from: "branding", to: "spa",      label: "theme, domain", kind: "control" }
     ]
   }
@@ -3056,7 +3020,7 @@ const MVP_TOUR = {
     {
       title: "Publishers and gateways",
       text: "Four publishers for a four rung ladder, one per rung, each with its own feed, key and postage batch, so a full batch costs a rung instead of the stream. The gateways are the other half of the same machine and have nothing to do with publishing: they are how a viewer reads when their own node will not start. Whether they belong to one brand or to all of them is undecided.",
-      open: ["platform", "beehost"], focus: ["beepub", "beegw"], light: ["beepub", "beegw", "swarm"], edge: "beepub>swarm",
+      open: ["platform", "beehost"], focus: ["beepub", "beegw"], light: ["beepub", "beegw"], edge: "beepub>beegw",
     },
     {
       title: "Watching: node first, gateway second",
@@ -3066,9 +3030,9 @@ const MVP_TOUR = {
     },
     {
       title: "Who pays, and how we know it is paid",
-      text: "Postage is what quietly kills a Swarm stream: a full batch keeps publishing holes while every log line still says success. So one component buys the batch, watches its TTL and bucket utilisation, dilutes before saturation, and watches the gateways' cheque balances for the same reason. It is the only thing here that spends money and the only thing that talks to the chain.",
-      open: ["platform", "admin"], focus: ["stampmgr", "chain"],
-      light: ["stampmgr", "chain", "beehost"], edge: "stampmgr>chain",
+      text: "Postage is what quietly kills a Swarm stream: a full batch keeps publishing holes while every log line still says success. So one component buys the batch, watches its TTL and bucket utilisation, dilutes before saturation, and watches the gateways' cheque balances for the same reason. It lives in the manager beside the deployer, because funding a stream and starting it are one operation, and it is the only thing here that spends money.",
+      open: ["platform", "sim"], focus: ["stampmgr", "beehost"],
+      light: ["stampmgr", "beehost"], edge: "stampmgr>beehost",
     },
     {
       title: "Operating it",
@@ -3083,7 +3047,7 @@ const MVP_TOUR = {
     {
       title: "Open: chat",
       text: "Swarm feeds or GSOC keep the whole product on one network, and are slow and unproven for a conversation. A websocket in the web2 layer works today and puts a centralised dependency in the middle of a decentralised product. Worth deciding here rather than during the build, because the two answers put the component in two different places.",
-      open: ["platform", "spa"], focus: "chat", light: ["chat", "abrplayer", "swarm"], overlay: "scope",
+      open: ["platform", "spa"], focus: "chat", light: ["chat", "abrplayer"], overlay: "scope",
     },
     {
       title: "Per brand or shared",
@@ -3118,7 +3082,7 @@ __mods["model/mvp/tags.js"] = function (__exports, __req) {
  *  without a scope shows up as a hole in the overlay rather than passing as
  *  shipped by default. */
 const SHIP = [
-  'brand', 'encoder', 'viewers', 'platform', 'swarm', 'chain',
+  'brand', 'encoder', 'viewers', 'platform',
   'gcp', 'sim', 'beehost', 'admin', 'spa',
   'srtin', 'ladder', 'packager', 'uploader',
   'simweb', 'simapi', 'simdb', 'simdeploy',
@@ -3129,10 +3093,9 @@ const SHIP = [
 
 const SCOPE_MEMBERS = {
   ship: SHIP,
-  // Four boxes, four different kinds of undecided: who owns a stream, whether
-  // chat is in at all, whether a publisher set is brought up by hand or by the
-  // manager, and whether the gateways are per brand or shared.
-  open: ['auth', 'chat', 'beeops', 'beegw'],
+  // Three boxes, three different kinds of undecided: who owns a stream,
+  // whether chat is in at all, and whether the gateways are per brand or shared.
+  open: ['auth', 'chat', 'beegw'],
   // Deliberately empty. The workshop fills it, and until it does there is
   // nothing here to point at and call a phase two.
   later: [],
@@ -3140,30 +3103,28 @@ const SCOPE_MEMBERS = {
 
 const FEATURE_MEMBERS = {
   'abr-stream': ['encoder', 'gcp', 'srtin', 'ladder', 'packager', 'uploader', 'beepub', 'sim'],
-  'abr-watch': ['spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'beegw', 'swarm'],
+  'abr-watch': ['spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'beegw'],
   branding: ['branding', 'spaboot', 'adminui'],
-  stamps: ['stampmgr', 'beepub', 'beegw', 'chain'],
+  stamps: ['stampmgr', 'beepub', 'beegw'],
   auth: ['auth', 'adminapi', 'simapi'],
   chat: ['chat'],
 };
 
 const TENANCY_MEMBERS = {
   perbrand: ['encoder', 'brand', 'gcp', 'srtin', 'ladder', 'packager', 'uploader', 'beepub',
-    'spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'branding', 'stampmgr'],
+    'spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'branding'],
   shared: ['admin', 'adminui', 'adminapi', 'admindb', 'auth', 'sim', 'simweb', 'simapi',
-    'simdb', 'simdeploy', 'beehost', 'beeops', 'platform'],
+    'simdb', 'simdeploy', 'stampmgr', 'beehost', 'platform'],
   tbd: ['beegw', 'chat'],
 };
 
 /** Where each thing runs. Also the always-on card colour for this model. */
 const MVP_PLACE_MEMBERS = {
-  gcp: ['gcp', 'srtin', 'ladder', 'packager', 'uploader', 'sim', 'simweb', 'simapi', 'simdb', 'simdeploy'],
-  vultr: ['beehost', 'beepub', 'beegw', 'beeops'],
-  web2: ['admin', 'adminui', 'adminapi', 'admindb', 'auth', 'stampmgr', 'branding', 'platform'],
+  gcp: ['gcp', 'srtin', 'ladder', 'packager', 'uploader', 'sim', 'simweb', 'simapi', 'simdb', 'simdeploy', 'stampmgr'],
+  vultr: ['beehost', 'beepub', 'beegw'],
+  web2: ['admin', 'adminui', 'adminapi', 'admindb', 'auth', 'branding', 'platform'],
   browser: ['spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'chat', 'viewers'],
   brandside: ['encoder', 'brand'],
-  swarm: ['swarm'],
-  chain: ['chain'],
 };
 
 const MVP_PLACE_COLOUR = Object.freeze({
@@ -3172,8 +3133,6 @@ const MVP_PLACE_COLOUR = Object.freeze({
   web2: '#8465B8',
   browser: '#2E8B63',
   brandside: '#B8763A',
-  swarm: '#B07A22',
-  chain: '#7C8B93',
 });
 
 /**
@@ -3188,7 +3147,7 @@ const MVP_GROUP_DEFS = [
     hint: 'What ships this month, what is undecided, what waits.',
     tags: [
       { id: 'ship', name: 'Ship this month', color: '#2E8B63',
-        hint: 'In scope for September. Twenty-nine boxes, and one brand on air.' },
+        hint: 'In scope for September. Twenty-seven boxes, and one brand on air.' },
       { id: 'open', name: 'Open question', color: '#B07A22',
         hint: 'Drawn because it has to exist, not because it is decided.' },
       { id: 'later', name: 'After the MVP', color: '#7C8B93',
@@ -3241,8 +3200,6 @@ const MVP_GROUP_DEFS = [
       { id: 'web2', name: 'Web2 host', color: MVP_PLACE_COLOUR.web2, hint: 'Ordinary hosting, and the only thing that spends.' },
       { id: 'browser', name: "Viewer's browser", color: MVP_PLACE_COLOUR.browser, hint: 'Runs on their device, so it fails for one person.' },
       { id: 'brandside', name: "Brand's side", color: MVP_PLACE_COLOUR.brandside, hint: 'Their venue and their encoder.' },
-      { id: 'swarm', name: 'Swarm', color: MVP_PLACE_COLOUR.swarm, hint: 'The public network. Nobody runs it, including us.' },
-      { id: 'chain', name: 'Gnosis Chain', color: MVP_PLACE_COLOUR.chain, hint: 'Where the postage and the cheques settle.' },
     ],
     members: MVP_PLACE_MEMBERS,
   },

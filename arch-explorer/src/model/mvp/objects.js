@@ -48,36 +48,22 @@ export const MVP_OBJECTS = {
     metrics: [["Containers", "5", ""], ["Brands", "1, of many", ""], ["Stages", "1", ""], ["Concurrent viewers", "about 500", ""]],
     note: "The MVP is deliberately one of everything. Read the crimson dots as a decision rather than an oversight: a second copy of most of this would cost real money to prove a property nobody is testing this month." },
 
-  swarm: { name: "Swarm", type: "External system", icon: "net", external: true,
-    tech: ["Bee", "Gnosis"],
-    desc: "Origin, delivery and archive. Also the candidate chat transport.",
-    scale: { count: "1", unit: "one public network, nobody's to run", grows: GROWS.COVERAGE, resilience: RESILIENCE.EXTERNAL,
-      onLoss: "Retrieval slows or stops for everyone at once, and the gateway fallback is no help, because it reads from the same network." },
-    blurb: "Segments are pushed in by the publishers and pulled out by the viewer, either by a node running in their browser or through one of our gateways. Whether chat rides on it too, as feed updates or GSOC, is one of the questions this workshop has to settle." },
-
-  chain: { name: "Gnosis Chain", type: "External system", icon: "store", external: true,
-    tech: ["Gnosis", "xBZZ"],
-    desc: "Postage batches bought and cheques settled, in xBZZ.",
-    scale: { count: "1", unit: "one chain, shared by everyone on it", grows: GROWS.FIXED, resilience: RESILIENCE.EXTERNAL,
-      onLoss: "No new batches and no cheque settlement. Publishing carries on against the postage already bought, until it fills." },
-    blurb: "Everything that costs money happens here: buying a postage batch for a stream, topping it up before it fills, and settling the gateways' cheques. The admin layer is the only thing that talks to it, which keeps spend and keys in one place." },
-
   /* ── Containers ── */
   gcp: { name: "Streaming infra (GCP)", type: "Container", icon: "app", drill: "stagehost",
-    tech: ["Terraform", "SRS", "ffmpeg"],
+    tech: ["Terraform"],
     desc: "One Terraform-built stage host: SRT in, ABR ladder, HLS out.",
     scale: { count: "1", unit: "one host per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
       onLoss: "That stage is off air until Terraform rebuilds the host; no other stage notices." },
-    blurb: "SRS terminates the SRT feed, ffmpeg encodes the ladder, the packager cuts two second segments and stream-uploader signs the feeds and pushes the chunks to the Bee publishers. One host holds all four, because at one stage there is nothing to gain by spreading them.",
+    blurb: "The ingest terminates the SRT feed, the transcoder encodes the ladder, the packager cuts two second segments and the uploader signs the feeds and pushes the chunks to the Bee publishers. One host holds all four, because at one stage there is nothing to gain by spreading them.",
     metrics: [["Hosts per stage", "1", ""], ["Renditions", "4, or 1", ""], ["vCPU", "about 7", ""]],
     note: "Terraform is what makes a single host acceptable. The recovery for losing one is applying the same definition again rather than repairing anything, which is a different bet from redundancy and a cheaper one at this size." },
 
   sim: { name: "streaming-infra-manager", type: "Container", icon: "system", drill: "manager",
     tech: ["Postgres", "docker compose"],
-    desc: "Deploys and operates the media stack, one stage at a time.",
+    desc: "Deploys the media stack per stage, and owns the postage and cheques.",
     scale: { count: "1", unit: "one manager for every stage", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
       onLoss: "Streams already running keep running. Nothing new can be provisioned and nothing can be stopped cleanly." },
-    blurb: "Holds what a stage needs to come up: the media profile, whether that is the four rung ladder or a single rendition, the port slot, the list of Bee publishers, the signing key, the postage batch and the SRT passphrase. API, web UI and Postgres, applying a profile by running docker compose over ssh.",
+    blurb: "Holds what a stage needs to come up: the media profile, whether that is the four rung ladder or a single rendition, the port slot, the list of Bee publishers, the signing key, the postage batch and the SRT passphrase. API, web UI and Postgres, applying a profile by running docker compose over ssh. The postage batches and the gateways' chequebooks are managed here too, so funding a stream and starting it are one operation.",
     note: "Today it runs on the stage host it deploys to, bound to loopback, which is why it has no authentication of its own. That holds while one machine is both the manager and the thing managed, and stops holding at the second stage." },
 
   beehost: { name: "Bee host (Vultr)", type: "Container", icon: "store", drill: "beehost",
@@ -92,7 +78,7 @@ export const MVP_OBJECTS = {
     desc: "The brand console and the API behind it. Multi-tenant.",
     scale: { count: "1", unit: "one admin layer for every brand", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
       onLoss: "Streaming continues. Nobody can create a stream, top up a batch or change a logo until it is back." },
-    blurb: "Streams, stamps and cheques, branding and users, for every brand rather than one. It is the only thing that spends money and the only thing that talks to the chain, so it is also where ownership has to be decided." },
+    blurb: "Streams, branding and users, for every brand rather than one. Anything that touches a host or a wallet it asks the manager to do, so this is where ownership has to be decided rather than where money moves." },
 
   spa: { name: "Viewer SPA", type: "Container", icon: "app", drill: "spa",
     tech: ["hls.js", "bee-js"],
@@ -102,21 +88,21 @@ export const MVP_OBJECTS = {
     blurb: "Loads the brand's theme and stream list, tries to start a Bee node in the browser and falls back to a gateway when it cannot. hls.js plays the ladder and switches rungs itself. Chat is drawn here because this is where it would live, not because it is decided." },
 
   /* ── Stage host components ── */
-  srtin: { name: "SRT ingest (SRS)", type: "Component", icon: "stream",
-    tech: ["SRS", "SRT"],
+  srtin: { name: "SRT ingest", type: "Component", icon: "stream",
+    tech: ["SRT"],
     desc: "Terminates SRT and checks the passphrase.",
     scale: { count: "1", unit: "one endpoint per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
       onLoss: "That stage's encoder cannot connect, so there is no feed to publish." },
-    blurb: "SRS listens on this stage's port slot with its own passphrase, and an unknown stream id is refused outright. That is the whole of ingest authentication, and it is enough for a pilot on a host nobody advertises." },
+    blurb: "Listens on this stage's port slot with its own passphrase, and an unknown stream id is refused outright. That is the whole of ingest authentication, and it is enough for a pilot on a host nobody advertises." },
 
-  ladder: { name: "ABR ladder (ffmpeg)", type: "Component", icon: "app",
-    tech: ["ffmpeg", "x264"],
+  ladder: { name: "ABR ladder", type: "Component", icon: "app",
+    tech: ["H.264"],
     desc: "Decodes the feed and encodes four rungs, or passes one through.",
-    scale: { count: "1", unit: "one ffmpeg set per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
+    scale: { count: "1", unit: "one transcoder per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
       onLoss: "That stage stops producing renditions, and every viewer on it stops with them." },
     blurb: "The media profile decides whether this is a four rung ABR ladder or a single rendition passed straight through. The ladder is the part of the MVP that is genuinely new work, and it is also the only thing on the host that costs real CPU.",
     metrics: [["Rungs", "4, or 1", ""], ["vCPU", "about 7", ""]],
-    note: "The CPU floor of the whole design: one ffmpeg per rung, about 7 vCPU for four rungs. Everything else on this host is doing I/O, which is why one machine per stage is enough and why the second stage needs a second machine." },
+    note: "The CPU floor of the whole design: one encoder process per rung, about 7 vCPU for four rungs. Everything else on this host is doing I/O, which is why one machine per stage is enough and why the second stage needs a second machine." },
 
   packager: { name: "HLS packager", type: "Component", icon: "queue",
     tech: ["HLS", "2 s"],
@@ -126,8 +112,8 @@ export const MVP_OBJECTS = {
     blurb: "Writes a master playlist and one variant playlist per rung, with two second segments cut on the encoder's keyframes. The uploader watches the output rather than being told about it, which keeps the two ends independent.",
     metrics: [["Segment", "2 s", ""], ["Variants", "4, or 1", ""]] },
 
-  uploader: { name: "stream-uploader", type: "Component", icon: "gateway",
-    tech: ["stream-uploader", "Bee API"],
+  uploader: { name: "Stream uploader", type: "Component", icon: "gateway",
+    tech: ["Bee API"],
     desc: "Signs the feeds, stamps the chunks, pushes them to the publishers.",
     scale: { count: "1", unit: "one uploader per stage", grows: GROWS.STAGES, resilience: RESILIENCE.SINGLE,
       onLoss: "Publishing stops for that stage while segments carry on being written to disk, so the stream is not live and the gap is at least recoverable." },
@@ -181,14 +167,6 @@ export const MVP_OBJECTS = {
     metrics: [["Gateways", "2", ""], ["Per brand or shared", "undecided", "open"]],
     note: "Whether these are per brand or shared by all of them is a workshop question with a price on it: shared is two machines for everyone, per brand is two more for every brand we sign." },
 
-  beeops: { name: "Bee deployment", type: "Component", icon: "system",
-    tech: ["scripts", "ssh"],
-    desc: "How a publisher set is brought up for a stream. Scripts, today.",
-    scale: { count: "1", unit: "one way of doing it, run by hand", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
-      onLoss: "Nothing running is affected. A new stream cannot be given its publishers until someone repeats the steps." },
-    blurb: "Bringing up four funded, keyed Bee nodes for a stream is a handful of scripts and a person following them. Whether the manager should own this instead is one of the questions for the workshop, and it is the difference between a demo and something a brand can start on its own.",
-    metrics: [["Run by", "a person, today", ""], ["Via the manager", "undecided", "open"]] },
-
   /* ── Viewer SPA components ── */
   spaboot: { name: "Brand bootstrap", type: "Component", icon: "app",
     tech: ["brand config"],
@@ -240,7 +218,7 @@ export const MVP_OBJECTS = {
     desc: "Every state change a brand can make, in one place.",
     scale: { count: "1", unit: "one API for every brand", grows: GROWS.FIXED, resilience: RESILIENCE.SINGLE,
       onLoss: "Nothing can be created, funded or changed. Whatever is running carries on running." },
-    blurb: "Calls the manager to provision a stream, the stamp manager to fund it, and the chain to buy a batch. Being the only writer is what makes ownership a tractable question: there is exactly one place to enforce it." },
+    blurb: "Calls the manager to provision a stream and to fund it. Being the only writer is what makes ownership a tractable question: there is exactly one place to enforce it." },
 
   admindb: { name: "Postgres", type: "Component", icon: "store",
     tech: ["Postgres"],

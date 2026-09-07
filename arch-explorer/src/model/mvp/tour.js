@@ -31,7 +31,7 @@ export const MVP_TOUR = {
     {
       title: "Publishers and gateways",
       text: "Four publishers for a four rung ladder, one per rung, each with its own feed, key and postage batch, so a full batch costs a rung instead of the stream. The gateways are the other half of the same machine and have nothing to do with publishing: they are how a viewer reads when their own node will not start. Whether they belong to one brand or to all of them is undecided.",
-      open: ["platform", "beehost"], focus: ["beepub", "beegw"], light: ["beepub", "beegw", "swarm"], edge: "beepub>swarm",
+      open: ["platform", "beehost"], focus: ["beepub", "beegw"], light: ["beepub", "beegw"], edge: "beepub>beegw",
     },
     {
       title: "Watching: node first, gateway second",
@@ -41,9 +41,9 @@ export const MVP_TOUR = {
     },
     {
       title: "Who pays, and how we know it is paid",
-      text: "Postage is what quietly kills a Swarm stream: a full batch keeps publishing holes while every log line still says success. So one component buys the batch, watches its TTL and bucket utilisation, dilutes before saturation, and watches the gateways' cheque balances for the same reason. It is the only thing here that spends money and the only thing that talks to the chain.",
-      open: ["platform", "admin"], focus: ["stampmgr", "chain"],
-      light: ["stampmgr", "chain", "beehost"], edge: "stampmgr>chain",
+      text: "Postage is what quietly kills a Swarm stream: a full batch keeps publishing holes while every log line still says success. So one component buys the batch, watches its TTL and bucket utilisation, dilutes before saturation, and watches the gateways' cheque balances for the same reason. It lives in the manager beside the deployer, because funding a stream and starting it are one operation, and it is the only thing here that spends money.",
+      open: ["platform", "sim"], focus: ["stampmgr", "beehost"],
+      light: ["stampmgr", "beehost"], edge: "stampmgr>beehost",
     },
     {
       title: "Operating it",
@@ -58,7 +58,7 @@ export const MVP_TOUR = {
     {
       title: "Open: chat",
       text: "Swarm feeds or GSOC keep the whole product on one network, and are slow and unproven for a conversation. A websocket in the web2 layer works today and puts a centralised dependency in the middle of a decentralised product. Worth deciding here rather than during the build, because the two answers put the component in two different places.",
-      open: ["platform", "spa"], focus: "chat", light: ["chat", "abrplayer", "swarm"], overlay: "scope",
+      open: ["platform", "spa"], focus: "chat", light: ["chat", "abrplayer"], overlay: "scope",
     },
     {
       title: "Per brand or shared",

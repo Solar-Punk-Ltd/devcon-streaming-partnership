@@ -23,23 +23,19 @@ export const MVP_DIAGRAMS = {
   context: {
     // Six boxes, and five of them are somebody else's. The whole of what we
     // build is the one in the middle, which is the honest shape of an MVP.
-    // The brand is the left column: their encoder and their operator. The
-    // right column is the decentralised side the stream lands on: Swarm, the
-    // viewers reading from it, and the chain the postage is bought on.
+    // The brand is the left column: their encoder and their operator; the
+    // viewers are the right. Swarm and the chain are not boxes here: the
+    // network is what the platform publishes into, not a component of it.
     name: "Streaming platform MVP", level: "Context", parent: null, w: 1250, h: 640,
     nodes: [
       { id: "encoder",  x: 20,  y: 120, w: 215, h: 140 },
       { id: "brand",    x: 20,  y: 330, w: 215, h: 140 },
       { id: "platform", x: 420, y: 230, w: 270, h: 185 },
-      { id: "swarm",    x: 820, y: 60,  w: 250, h: 150 },
-      { id: "viewers",  x: 820, y: 250, w: 250, h: 140 },
-      { id: "chain",    x: 820, y: 440, w: 250, h: 140 }
+      { id: "viewers",  x: 820, y: 250, w: 250, h: 140 }
     ],
     edges: [
       { from: "encoder",  to: "platform", label: "SRT per stage", strong: true },
       { from: "brand",    to: "platform", label: "manages", kind: "control" },
-      { from: "platform", to: "chain",    label: "buys stamps", kind: "control" },
-      { from: "platform", to: "swarm",    label: "feeds + chunks", strong: true },
       { from: "platform", to: "viewers",  label: "branded SPA", strong: true }
     ]
   },
@@ -49,8 +45,7 @@ export const MVP_DIAGRAMS = {
     // Two rows. The top one is the signal: stage host, Bee host, SPA, left to
     // right. The bottom one is control: the manager under the stage host it
     // deploys to, so "deploys" is one short vertical edge, and the admin layer
-    // under the Bee host, so it sits next to the SPA it configures and the
-    // chain it buys on lies straight ahead of it under the SPA. The SPA stands
+    // under the Bee host, so it sits next to the SPA it configures. The SPA stands
     // alone in its column and centres between the rows. The one edge that has
     // to cross a card, the brand reaching the admin layer past the manager,
     // is left to the router, which lifts it through the gap between the rows.
@@ -71,21 +66,16 @@ export const MVP_DIAGRAMS = {
       { id: "spa",     x: 900,  y: 195, w: 230, h: 150 },
       { id: "encoder", x: 30,   y: 120, w: 200, h: 140 },
       { id: "brand",   x: 30,   y: 330, w: 200, h: 140 },
-      { id: "swarm",   x: 1200, y: 60,  w: 220, h: 140 },
-      { id: "viewers", x: 1200, y: 250, w: 220, h: 130 },
-      { id: "chain",   x: 1200, y: 440, w: 220, h: 140 }
+      { id: "viewers", x: 1200, y: 250, w: 220, h: 130 }
     ],
     edges: [
       { from: "encoder", to: "gcp",     label: "SRT per stage", strong: true },
       { from: "gcp",     to: "beehost", label: "stamped chunks", strong: true },
-      { from: "beehost", to: "swarm",   label: "pushsync", strong: true },
-      { from: "swarm",   to: "spa",     label: "chunks", strong: true },
-      { from: "beehost", to: "spa",     label: "HLS fallback", kind: "media" },
+      { from: "beehost", to: "spa",     label: "chunks or HLS", strong: true },
       { from: "spa",     to: "viewers", label: "playback", strong: true },
       { from: "brand",   to: "admin",   label: "manages", kind: "control" },
       { from: "admin",   to: "sim",     label: "provision", kind: "control" },
       { from: "sim",     to: "gcp",     label: "deploys", kind: "control" },
-      { from: "admin",   to: "chain",   label: "buys stamps", kind: "control" },
       { from: "admin",   to: "spa",     label: "brand config", kind: "control" }
     ]
   },
@@ -116,25 +106,34 @@ export const MVP_DIAGRAMS = {
   },
 
   manager: {
-    // The deployer is the only part of this that leaves the box, and today it
-    // leaves it over loopback, because the manager runs on the host it
-    // deploys to. That is why there is no authentication in this diagram.
-    // It sits on top so its one edge out, up to the stage host above this
-    // box, leaves through the top with nothing in the way.
-    name: "streaming-infra-manager", level: "Components", parent: "containers", of: "sim", w: 1360, h: 520,
+    // The API is the hub, so it sits in the middle of its column with the
+    // deployer above it and the database below: both edges are one vertical
+    // hop. The deployer on top means its one edge out, up to the stage host
+    // above this box, leaves through the top with nothing in the way. The
+    // stamp and chequebook manager lives here rather than in the admin
+    // layer, because funding a stream and starting it are one operation from
+    // the brand's side; it is the only part of the manager that touches
+    // money, and its edge to the Bee host is the only one that leaves
+    // sideways. Today the manager runs on the host it deploys to over
+    // loopback, which is why there is no authentication in this diagram.
+    name: "streaming-infra-manager", level: "Components", parent: "containers", of: "sim", w: 1360, h: 700,
     nodes: [
-      { id: "simweb",    x: 300,  y: 200, w: 220, h: 140 },
-      { id: "simapi",    x: 570,  y: 200, w: 220, h: 140 },
-      { id: "simdeploy", x: 840,  y: 60,  w: 220, h: 140 },
-      { id: "simdb",     x: 840,  y: 340, w: 220, h: 140 },
-      { id: "admin",     x: 30,   y: 200, w: 220, h: 140 },
-      { id: "gcp",       x: 1110, y: 340, w: 220, h: 140 }
+      { id: "simweb",    x: 300,  y: 280, w: 220, h: 140 },
+      { id: "simdeploy", x: 570,  y: 60,  w: 220, h: 140 },
+      { id: "simapi",    x: 570,  y: 280, w: 220, h: 140 },
+      { id: "simdb",     x: 570,  y: 500, w: 220, h: 140 },
+      { id: "stampmgr",  x: 840,  y: 280, w: 230, h: 150 },
+      { id: "admin",     x: 30,   y: 280, w: 220, h: 140 },
+      { id: "gcp",       x: 1110, y: 60,  w: 220, h: 140 },
+      { id: "beehost",   x: 1110, y: 280, w: 220, h: 140 }
     ],
     edges: [
       { from: "simweb",    to: "simapi",    label: "calls" },
-      { from: "simapi",    to: "simdb",     label: "state" },
       { from: "simapi",    to: "simdeploy", label: "apply", kind: "control" },
+      { from: "simapi",    to: "simdb",     label: "state" },
+      { from: "simapi",    to: "stampmgr",  label: "fund", kind: "control" },
       { from: "simdeploy", to: "gcp",       label: "up / down", kind: "control" },
+      { from: "stampmgr",  to: "beehost",   label: "top up, TTL", kind: "control" },
       { from: "admin",     to: "simapi",    label: "provision", kind: "control" }
     ]
   },
@@ -142,30 +141,23 @@ export const MVP_DIAGRAMS = {
   beehost: {
     // Two halves of one machine that have nothing to do with each other: the
     // publishers write, the gateways read, and the only thing they share is
-    // the host and the bill. Whether that is a mistake is a workshop
-    // question, which is why the deployment of a publisher set is drawn as a
-    // box rather than left implied. The admin layer's money edges land here,
-    // on the two things that actually hold stamps and cheques, and since the
-    // admin layer sits under this box the publishers are drawn on the lower
-    // row so that edge arrives from below instead of through the deployment.
+    // the host and the bill. Swarm sits between them and is not a box, so the
+    // one edge between the halves says so in its label. The admin layer's
+    // money edges land here, on the two things that hold stamps and cheques.
     name: "Bee host (Vultr)", level: "Components", parent: "containers", of: "beehost", w: 1120, h: 520,
     nodes: [
-      { id: "beeops", x: 300, y: 60,  w: 220, h: 150 },
       { id: "beepub", x: 300, y: 300, w: 220, h: 150 },
       { id: "beegw",  x: 570, y: 300, w: 220, h: 150 },
       { id: "gcp",    x: 30,  y: 60,  w: 220, h: 140 },
       { id: "admin",  x: 30,  y: 300, w: 220, h: 140 },
-      { id: "swarm",  x: 570, y: 60,  w: 220, h: 140 },
       { id: "spa",    x: 840, y: 60,  w: 220, h: 150 }
     ],
     edges: [
       { from: "gcp",    to: "beepub", label: "chunks", strong: true },
-      { from: "beepub", to: "swarm",  label: "pushsync", strong: true },
-      { from: "swarm",  to: "beegw",  label: "retrieval", strong: true },
+      { from: "beepub", to: "beegw",  label: "via Swarm", strong: true },
       { from: "beegw",  to: "spa",    label: "HLS", kind: "media" },
       { from: "admin",  to: "beepub", label: "top up stamps", kind: "control" },
-      { from: "admin",  to: "beegw",  label: "cheques", kind: "control" },
-      { from: "beeops", to: "beepub", label: "per stream", kind: "control" }
+      { from: "admin",  to: "beegw",  label: "cheques", kind: "control" }
     ]
   },
 
@@ -187,7 +179,6 @@ export const MVP_DIAGRAMS = {
       { id: "spaboot",    x: 300, y: 500, w: 220, h: 140 },
       { id: "abrplayer",  x: 570, y: 60,  w: 220, h: 150 },
       { id: "chat",       x: 570, y: 280, w: 220, h: 140 },
-      { id: "swarm",      x: 30,  y: 60,  w: 220, h: 140 },
       { id: "beehost",    x: 30,  y: 280, w: 220, h: 140 },
       { id: "admin",      x: 30,  y: 500, w: 220, h: 140 },
       { id: "viewers",    x: 840, y: 60,  w: 220, h: 140 }
@@ -195,7 +186,7 @@ export const MVP_DIAGRAMS = {
     edges: [
       { from: "admin",      to: "spaboot",    label: "brand config", kind: "control" },
       { from: "spaboot",    to: "gwfallback", label: "gateway list", kind: "control" },
-      { from: "swarm",      to: "innode",     label: "chunks", strong: true },
+      { from: "beehost",    to: "innode",     label: "via Swarm", strong: true },
       { from: "innode",     to: "abrplayer",  label: "segments", strong: true },
       { from: "beehost",    to: "gwfallback", label: "HLS", kind: "media" },
       { from: "gwfallback", to: "abrplayer",  label: "fallback", kind: "media" },
@@ -204,9 +195,9 @@ export const MVP_DIAGRAMS = {
   },
 
   admin: {
-    // Console, API, database, and then three things that are each somebody
-    // else's problem to receive: the manager gets a stream, the chain and the
-    // Bee host get money, the SPA gets a look. Authentication is drawn beside
+    // Console, API, database, and then two things that are somebody else's
+    // problem to receive: the manager gets a stream and the money to fund it,
+    // the SPA gets a look. Nothing here touches a wallet. Authentication is drawn beside
     // the API rather than in front of the console, because the question is
     // which brand a call may act for, not who may see a page. The manager is
     // repeated as its API rather than as the whole box, so that with both
@@ -217,12 +208,9 @@ export const MVP_DIAGRAMS = {
       { id: "auth",     x: 300,  y: 280, w: 220, h: 150 },
       { id: "adminapi", x: 570,  y: 60,  w: 220, h: 140 },
       { id: "admindb",  x: 570,  y: 280, w: 220, h: 140 },
-      { id: "stampmgr", x: 840,  y: 60,  w: 230, h: 150 },
       { id: "branding", x: 840,  y: 500, w: 230, h: 140 },
       { id: "brand",    x: 30,   y: 60,  w: 220, h: 140 },
       { id: "simapi",   x: 840,  y: 280, w: 230, h: 140 },
-      { id: "beehost",  x: 1120, y: 60,  w: 230, h: 140 },
-      { id: "chain",    x: 1120, y: 280, w: 230, h: 140 },
       { id: "spa",      x: 1120, y: 500, w: 230, h: 140 }
     ],
     edges: [
@@ -231,8 +219,6 @@ export const MVP_DIAGRAMS = {
       { from: "adminapi", to: "admindb",  label: "state" },
       { from: "auth",     to: "adminapi", label: "authorises", kind: "control" },
       { from: "adminapi", to: "simapi",   label: "provision", kind: "control" },
-      { from: "stampmgr", to: "beehost",  label: "top up, TTL", kind: "control" },
-      { from: "stampmgr", to: "chain",    label: "buys batches", kind: "control" },
       { from: "branding", to: "spa",      label: "theme, domain", kind: "control" }
     ]
   }

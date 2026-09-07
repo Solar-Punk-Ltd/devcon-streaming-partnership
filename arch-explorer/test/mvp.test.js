@@ -73,11 +73,11 @@ test('the platform holds five containers, in the order they are drawn', () => {
   // Counted the way the tree counts, so a card cannot claim more parts than
   // the row beside it: the externals a detail diagram repeats do not count.
   assert.deepEqual(childCounts(mvp), {
-    platform: 5, gcp: 4, sim: 4, beehost: 3, admin: 6, spa: 5,
-    brand: 0, encoder: 0, viewers: 0, swarm: 0, chain: 0,
+    platform: 5, gcp: 4, sim: 5, beehost: 2, admin: 5, spa: 5,
+    brand: 0, encoder: 0, viewers: 0,
     srtin: 0, ladder: 0, packager: 0, uploader: 0,
     simweb: 0, simapi: 0, simdb: 0, simdeploy: 0,
-    beepub: 0, beeops: 0, beegw: 0,
+    beepub: 0, beegw: 0,
     adminui: 0, auth: 0, adminapi: 0, admindb: 0, stampmgr: 0, branding: 0,
     spaboot: 0, innode: 0, gwfallback: 0, abrplayer: 0, chat: 0,
   });
@@ -89,7 +89,7 @@ test('the brand and the network sit beside the platform, not inside it', () => {
   const platform = tree.children.find((c) => c.id === 'platform');
   const inside = flatten(platform).map((n) => n.id);
 
-  for (const id of ['brand', 'encoder', 'viewers', 'swarm', 'chain']) {
+  for (const id of ['brand', 'encoder', 'viewers']) {
     assert.ok(top.includes(id), `${id} should be a sibling of the platform`);
     assert.equal(inside.includes(id), false, `${id} is repeated for context, not contained`);
   }
@@ -156,9 +156,9 @@ test('the overlay bar asks the workshop questions first', () => {
   assert.deepEqual(GROUPS.map((g) => g.id), ['scope', 'feature', 'tenancy', 'place', 'scale', 'tech']);
 });
 
-test('the scope overlay accounts for every object, and names four as open', () => {
-  assert.equal(tag('scope', 'ship').count, 29);
-  assert.deepEqual(tag('scope', 'open').objects, ['auth', 'chat', 'beeops', 'beegw']);
+test('the scope overlay accounts for every object, and names three as open', () => {
+  assert.equal(tag('scope', 'ship').count, 27);
+  assert.deepEqual(tag('scope', 'open').objects, ['auth', 'chat', 'beegw']);
   // Defined and empty: the workshop fills it, and an empty chip in the legend
   // would be a claim that something is already deferred.
   assert.equal(tag('scope', 'later'), undefined);
@@ -168,7 +168,7 @@ test('the scope overlay accounts for every object, and names four as open', () =
 test('a feature is never one box', () => {
   assert.deepEqual(
     group('feature').tags.map((t) => [t.id, t.count]),
-    [['abr-stream', 8], ['abr-watch', 7], ['branding', 3], ['stamps', 4], ['auth', 3], ['chat', 1]],
+    [['abr-stream', 8], ['abr-watch', 6], ['branding', 3], ['stamps', 3], ['auth', 3], ['chat', 1]],
   );
   // The one group where a box legitimately carries two tags, which is the
   // whole point of the overlay: features share components.
@@ -179,7 +179,7 @@ test('a feature is never one box', () => {
 test('tenancy prices the second brand', () => {
   assert.deepEqual(
     group('tenancy').tags.map((t) => [t.id, t.count]),
-    [['perbrand', 15], ['shared', 13], ['tbd', 2]],
+    [['perbrand', 14], ['shared', 13], ['tbd', 2]],
   );
   assert.deepEqual(tag('tenancy', 'tbd').objects, ['beegw', 'chat']);
 });
@@ -187,7 +187,7 @@ test('tenancy prices the second brand', () => {
 test('where it runs covers every object exactly once', () => {
   assert.deepEqual(
     group('place').tags.map((t) => [t.id, t.count]),
-    [['gcp', 10], ['vultr', 4], ['web2', 8], ['browser', 7], ['brandside', 2], ['swarm', 1], ['chain', 1]],
+    [['gcp', 11], ['vultr', 3], ['web2', 7], ['browser', 7], ['brandside', 2]],
   );
   assert.deepEqual(Object.keys(MVP_PLACE_MEMBERS), Object.keys(MVP_PLACE_COLOUR));
 
@@ -254,7 +254,7 @@ test('the MVP claims no redundancy it does not have', () => {
     [RESILIENCE.CLIENT, RESILIENCE.EXTERNAL, RESILIENCE.POOL].sort(),
   );
   assert.deepEqual(postures[RESILIENCE.POOL], ['beegw'], 'only the gateways are a pool');
-  assert.deepEqual(postures[RESILIENCE.EXTERNAL].sort(), ['brand', 'chain', 'encoder', 'swarm']);
+  assert.deepEqual(postures[RESILIENCE.EXTERNAL].sort(), ['brand', 'encoder']);
 });
 
 test('every icon is one the icon set actually draws', () => {

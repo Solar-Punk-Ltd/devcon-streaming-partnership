@@ -19,7 +19,7 @@
  *  without a scope shows up as a hole in the overlay rather than passing as
  *  shipped by default. */
 const SHIP = [
-  'brand', 'encoder', 'viewers', 'platform', 'swarm', 'chain',
+  'brand', 'encoder', 'viewers', 'platform',
   'gcp', 'sim', 'beehost', 'admin', 'spa',
   'srtin', 'ladder', 'packager', 'uploader',
   'simweb', 'simapi', 'simdb', 'simdeploy',
@@ -30,10 +30,9 @@ const SHIP = [
 
 const SCOPE_MEMBERS = {
   ship: SHIP,
-  // Four boxes, four different kinds of undecided: who owns a stream, whether
-  // chat is in at all, whether a publisher set is brought up by hand or by the
-  // manager, and whether the gateways are per brand or shared.
-  open: ['auth', 'chat', 'beeops', 'beegw'],
+  // Three boxes, three different kinds of undecided: who owns a stream,
+  // whether chat is in at all, and whether the gateways are per brand or shared.
+  open: ['auth', 'chat', 'beegw'],
   // Deliberately empty. The workshop fills it, and until it does there is
   // nothing here to point at and call a phase two.
   later: [],
@@ -41,30 +40,28 @@ const SCOPE_MEMBERS = {
 
 const FEATURE_MEMBERS = {
   'abr-stream': ['encoder', 'gcp', 'srtin', 'ladder', 'packager', 'uploader', 'beepub', 'sim'],
-  'abr-watch': ['spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'beegw', 'swarm'],
+  'abr-watch': ['spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'beegw'],
   branding: ['branding', 'spaboot', 'adminui'],
-  stamps: ['stampmgr', 'beepub', 'beegw', 'chain'],
+  stamps: ['stampmgr', 'beepub', 'beegw'],
   auth: ['auth', 'adminapi', 'simapi'],
   chat: ['chat'],
 };
 
 const TENANCY_MEMBERS = {
   perbrand: ['encoder', 'brand', 'gcp', 'srtin', 'ladder', 'packager', 'uploader', 'beepub',
-    'spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'branding', 'stampmgr'],
+    'spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'branding'],
   shared: ['admin', 'adminui', 'adminapi', 'admindb', 'auth', 'sim', 'simweb', 'simapi',
-    'simdb', 'simdeploy', 'beehost', 'beeops', 'platform'],
+    'simdb', 'simdeploy', 'stampmgr', 'beehost', 'platform'],
   tbd: ['beegw', 'chat'],
 };
 
 /** Where each thing runs. Also the always-on card colour for this model. */
 export const MVP_PLACE_MEMBERS = {
-  gcp: ['gcp', 'srtin', 'ladder', 'packager', 'uploader', 'sim', 'simweb', 'simapi', 'simdb', 'simdeploy'],
-  vultr: ['beehost', 'beepub', 'beegw', 'beeops'],
-  web2: ['admin', 'adminui', 'adminapi', 'admindb', 'auth', 'stampmgr', 'branding', 'platform'],
+  gcp: ['gcp', 'srtin', 'ladder', 'packager', 'uploader', 'sim', 'simweb', 'simapi', 'simdb', 'simdeploy', 'stampmgr'],
+  vultr: ['beehost', 'beepub', 'beegw'],
+  web2: ['admin', 'adminui', 'adminapi', 'admindb', 'auth', 'branding', 'platform'],
   browser: ['spa', 'spaboot', 'innode', 'gwfallback', 'abrplayer', 'chat', 'viewers'],
   brandside: ['encoder', 'brand'],
-  swarm: ['swarm'],
-  chain: ['chain'],
 };
 
 export const MVP_PLACE_COLOUR = Object.freeze({
@@ -73,8 +70,6 @@ export const MVP_PLACE_COLOUR = Object.freeze({
   web2: '#8465B8',
   browser: '#2E8B63',
   brandside: '#B8763A',
-  swarm: '#B07A22',
-  chain: '#7C8B93',
 });
 
 /**
@@ -89,7 +84,7 @@ export const MVP_GROUP_DEFS = [
     hint: 'What ships this month, what is undecided, what waits.',
     tags: [
       { id: 'ship', name: 'Ship this month', color: '#2E8B63',
-        hint: 'In scope for September. Twenty-nine boxes, and one brand on air.' },
+        hint: 'In scope for September. Twenty-seven boxes, and one brand on air.' },
       { id: 'open', name: 'Open question', color: '#B07A22',
         hint: 'Drawn because it has to exist, not because it is decided.' },
       { id: 'later', name: 'After the MVP', color: '#7C8B93',
@@ -142,8 +137,6 @@ export const MVP_GROUP_DEFS = [
       { id: 'web2', name: 'Web2 host', color: MVP_PLACE_COLOUR.web2, hint: 'Ordinary hosting, and the only thing that spends.' },
       { id: 'browser', name: "Viewer's browser", color: MVP_PLACE_COLOUR.browser, hint: 'Runs on their device, so it fails for one person.' },
       { id: 'brandside', name: "Brand's side", color: MVP_PLACE_COLOUR.brandside, hint: 'Their venue and their encoder.' },
-      { id: 'swarm', name: 'Swarm', color: MVP_PLACE_COLOUR.swarm, hint: 'The public network. Nobody runs it, including us.' },
-      { id: 'chain', name: 'Gnosis Chain', color: MVP_PLACE_COLOUR.chain, hint: 'Where the postage and the cheques settle.' },
     ],
     members: MVP_PLACE_MEMBERS,
   },
