@@ -4,11 +4,11 @@
  * narrow widths: it becomes an overlay instead.
  */
 
-import { containmentTree, OBJECTS } from '../model/index.js';
+import { containmentTree, OBJECTS, INITIAL_OPEN } from '../model/index.js';
 import { icon, glyph } from '../render/icons.js';
 
 export function createTree(mount, { onSelect, onOpen }) {
-  const expanded = new Set(['sys']);
+  const expanded = new Set(INITIAL_OPEN);
 
   function render(state = {}) {
     mount.replaceChildren();

@@ -18,6 +18,7 @@ export const GROWS = {
   VIEWERS: 'viewers',
   COVERAGE: 'coverage',
   REGIONS: 'regions',
+  BRANDS: 'brands',
   FIXED: 'fixed',
 };
 
@@ -37,6 +38,7 @@ export const GROWS_LABEL = Object.freeze({
   [GROWS.VIEWERS]: 'Grows with viewers',
   [GROWS.COVERAGE]: 'Grows with coverage',
   [GROWS.REGIONS]: 'One per region',
+  [GROWS.BRANDS]: 'Grows with brands',
   [GROWS.FIXED]: 'Fixed size',
 });
 

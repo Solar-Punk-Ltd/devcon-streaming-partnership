@@ -17,6 +17,12 @@ npm run dev
 Then open http://127.0.0.1:4173. Native ES modules need a real origin, so
 opening `index.html` off the filesystem will not work.
 
+Two models share the explorer. The default is the Devcon 8 streaming
+architecture. The September MVP of the multi-brand streaming platform is at
+http://127.0.0.1:4173/?model=mvp, and the parameter survives navigation, so a
+link into the MVP comes back to the MVP. Both models are in the built file, so
+`?model=mvp` works on that too.
+
 ```bash
 npm test      # no browser needed
 npm run build # one self-contained file in dist/

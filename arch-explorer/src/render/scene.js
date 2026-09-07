@@ -14,7 +14,7 @@ import {
 } from '../geom/viewport.js';
 import { edgeGeometry, routedEdge, pathOf } from '../geom/routing.js';
 import { icon, glyph, shapeOf } from './icons.js';
-import { PLACE_COLOUR, placeOf } from '../model/tags.js';
+import { PLACE_COLOUR, placeOf } from '../model/index.js';
 import { multiplicity, colourOf, resilienceName } from '../model/scale.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';

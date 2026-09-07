@@ -5,13 +5,20 @@
  *
  * Everything here is derived. The three literals stay the single source of
  * truth, so replacing them replaces the content without touching a view.
+ *
+ * Which set of literals arrives is ./select.js's business. The derivations
+ * below take the model they read as an optional argument defaulting to the
+ * active one, so the same functions can answer the same questions about a
+ * model that is not on screen, which is how the second model is tested.
  */
 
-import { OBJECTS } from './objects.js';
-import { DIAGRAMS } from './diagrams.js';
-import { TOUR } from './tour.js';
-import { buildTagGroups, tagsByObject } from './tags.js';
+import { MODEL } from './select.js';
+import { buildTagGroups, tagsByObject, placeIndex } from './tags.js';
 import { validateModel, edgeKey } from './schema.js';
+
+export const OBJECTS = MODEL.objects;
+export const DIAGRAMS = MODEL.diagrams;
+export const TOUR = MODEL.tour;
 
 for (const [id, d] of Object.entries(DIAGRAMS)) d.id = id;
 for (const [id, o] of Object.entries(OBJECTS)) o.id = id;
@@ -19,52 +26,69 @@ TOUR.steps.forEach((s, i) => { s.index = i; });
 
 export const ROOT_DIAGRAM = 'context';
 
+/** What the chrome needs to name the model it is showing. */
+export const MODEL_ID = MODEL.id;
+export const MODEL_MARK = MODEL.mark;
+export const ROOT_NAME = DIAGRAMS[ROOT_DIAGRAM].name;
+/** Open on arrival: the one system worth being inside rather than looking at. */
+export const INITIAL_OPEN = MODEL.open;
+
 /** Diagram ids from the root down to `id`, inclusive. */
-export function ancestry(diagramId) {
+export function ancestry(diagramId, diagrams = DIAGRAMS) {
   const chain = [];
   let cursor = diagramId;
   const guard = new Set();
-  while (cursor && DIAGRAMS[cursor] && !guard.has(cursor)) {
+  while (cursor && diagrams[cursor] && !guard.has(cursor)) {
     guard.add(cursor);
     chain.unshift(cursor);
-    cursor = DIAGRAMS[cursor].parent;
+    cursor = diagrams[cursor].parent;
   }
   return chain;
 }
 
 /**
- * Nested containment, the shape the systems view draws.
+ * Nested containment, the shape the canvas draws.
  *
- * A child of X is an object placed in X's drill diagram that no ancestor
- * diagram already places. Without that second clause the external actors a
- * detail diagram repeats for context, Devcon AV and the viewers, would read
- * as living inside the system they merely talk to.
+ * An object is claimed by the shallowest diagram that places it, and between
+ * two diagrams at the same depth by whichever is drawn first. Everywhere else
+ * it appears it is context being repeated: without that, the external actors
+ * a detail diagram repeats, Devcon AV and the viewers, would read as living
+ * inside the system they merely talk to, and a component two branches both
+ * talk to would be drawn twice with two different parents.
+ *
+ * One claim set for the whole walk rather than one per branch, which is what
+ * makes that last case work, and it is the same rule schema.js validates the
+ * walkthrough against. Two rules here would mean a model that validates and
+ * still renders a box twice.
  */
-export function containmentTree() {
-  const build = (diagramId, seenAbove) => {
-    const d = DIAGRAMS[diagramId];
-    if (!d) return [];
-    const seen = new Set(seenAbove);
-    for (const n of d.nodes) seen.add(n.id);
+export function containmentTree(m = ACTIVE) {
+  const claimed = new Set();
 
-    return d.nodes
-      .filter((n) => !seenAbove.has(n.id))
-      .map((n) => {
-        const o = OBJECTS[n.id];
-        return {
-          id: n.id,
-          object: o,
-          diagram: diagramId,
-          children: o.drill ? build(o.drill, seen) : [],
-        };
-      });
+  const build = (diagramId) => {
+    const d = m.diagrams[diagramId];
+    if (!d) return [];
+
+    // The whole level is claimed before anything descends, so a sibling
+    // further down cannot take a node this one has already placed.
+    const fresh = d.nodes.filter((n) => !claimed.has(n.id));
+    for (const n of fresh) claimed.add(n.id);
+
+    return fresh.map((n) => {
+      const o = m.objects[n.id];
+      return {
+        id: n.id,
+        object: o,
+        diagram: diagramId,
+        children: o.drill ? build(o.drill) : [],
+      };
+    });
   };
 
   return {
     id: ROOT_DIAGRAM,
     object: null,
     diagram: ROOT_DIAGRAM,
-    children: build(ROOT_DIAGRAM, new Set()),
+    children: build(ROOT_DIAGRAM),
   };
 }
 
@@ -81,9 +105,9 @@ export const flatten = (node, depth = 0, out = []) => {
  * objects connected at several levels of detail is one dependency, recorded
  * once with the places it shows up.
  */
-export function connectionIndex() {
+export function connectionIndex(m = ACTIVE) {
   const byPair = new Map();
-  for (const [did, d] of Object.entries(DIAGRAMS)) {
+  for (const [did, d] of Object.entries(m.diagrams)) {
     for (const e of d.edges) {
       const key = edgeKey(e.from, e.to);
       const entry = byPair.get(key) || { from: e.from, to: e.to, labels: [], diagrams: [], strong: false };
@@ -125,8 +149,8 @@ export function downstreamOf(objectId, connections = CONNECTIONS, maxDepth = 4) 
 }
 
 /** Where in the walkthrough an object is talked about. */
-export function tourStepsFor(objectId) {
-  return TOUR.steps.filter((s) => {
+export function tourStepsFor(objectId, tour = TOUR) {
+  return tour.steps.filter((s) => {
     if (s.focus === objectId) return true;
     if (Array.isArray(s.focus) && s.focus.includes(objectId)) return true;
     if ((s.light || []).includes(objectId)) return true;
@@ -156,13 +180,13 @@ export function searchIndex() {
 }
 
 /** Object id to its containing object id, from the containment tree. */
-export function parentIndex() {
+export function parentIndex(m = ACTIVE) {
   const parents = {};
   const walk = (list, parent) => list.forEach((n) => {
     parents[n.id] = parent;
     walk(n.children, n.id);
   });
-  walk(containmentTree().children, null);
+  walk(containmentTree(m).children, null);
   return parents;
 }
 
@@ -217,12 +241,12 @@ export function revealsFinerEdge(c, boxId, objects = OBJECTS, diagrams = DIAGRAM
  * by the ingest edge under that name, so opening the pipeline deleted the
  * arrow into it and drew no replacement.
  */
-export function connectionsAmong(open) {
-  const visible = (id) => visibleStandIn(id, open) === id;
+export function connectionsAmong(open, m = ACTIVE) {
+  const visible = (id) => visibleStandIn(id, open, m.parents) === id;
 
-  return CONNECTIONS.filter((c) => {
+  return m.connections.filter((c) => {
     if (!visible(c.from) || !visible(c.to)) return false;
-    return ![c.from, c.to].some((end) => open.has(end) && revealsFinerEdge(c, end));
+    return ![c.from, c.to].some((end) => open.has(end) && revealsFinerEdge(c, end, m.objects, m.diagrams));
   });
 }
 
@@ -232,26 +256,46 @@ export function connectionsAmong(open) {
  * it repeats for context, so a card would claim eleven parts next to a tree
  * row saying eight.
  */
-export function childCounts() {
+export function childCounts(m = ACTIVE) {
   const counts = {};
   const walk = (list) => list.forEach((n) => {
     counts[n.id] = n.children.length;
     walk(n.children);
   });
-  walk(containmentTree().children);
+  walk(containmentTree(m).children);
   return counts;
 }
 
-export const PARENTS = parentIndex();
-export const CHILD_COUNTS = childCounts();
-export const TAG_GROUPS = buildTagGroups(OBJECTS);
+/**
+ * One model's literals with the two indexes every question needs, so a model
+ * can be interrogated without being the one the page is showing.
+ */
+export function indexModel(objects, diagrams) {
+  const literals = { objects, diagrams };
+  return {
+    objects,
+    diagrams,
+    parents: parentIndex(literals),
+    connections: connectionIndex(literals),
+  };
+}
+
+/** The model on screen, indexed. Every derivation above defaults to it. */
+export const ACTIVE = indexModel(OBJECTS, DIAGRAMS);
+
+export const PARENTS = ACTIVE.parents;
+export const CONNECTIONS = ACTIVE.connections;
+export const CHILD_COUNTS = childCounts(ACTIVE);
+export const TAG_GROUPS = buildTagGroups(OBJECTS, MODEL.groups);
 export const TAGS_BY_OBJECT = tagsByObject(TAG_GROUPS);
-export const CONNECTIONS = connectionIndex();
+
+/** Where each thing runs, painted on every card all the time. Per model. */
+export const PLACE_COLOUR = MODEL.placeColour;
+export const placeOf = placeIndex(MODEL.places);
+
 export const VALIDATION = validateModel({
   objects: OBJECTS,
   diagrams: DIAGRAMS,
   tour: TOUR,
   overlays: new Set(TAG_GROUPS.map((g) => g.id)),
 });
-
-export { OBJECTS, DIAGRAMS, TOUR };

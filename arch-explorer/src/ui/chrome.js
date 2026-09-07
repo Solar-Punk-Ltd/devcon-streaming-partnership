@@ -3,7 +3,7 @@
  * the command palette, the theme switch and the toast.
  */
 
-import { OBJECTS, ancestorsOf, searchIndex } from '../model/index.js';
+import { OBJECTS, ancestorsOf, searchIndex, MODEL_MARK, ROOT_NAME } from '../model/index.js';
 import { icon, glyph } from '../render/icons.js';
 
 const THEME_KEY = 'arch-explorer-theme';
@@ -24,8 +24,8 @@ export function createChrome(refs, handlers) {
 function buildRail(rail, { onExpandAll, onCollapseAll, onToggleTheme, onSearch }) {
   const mark = document.createElement('div');
   mark.className = 'rail-mark';
-  mark.textContent = 'D8';
-  mark.title = 'Devcon 8 streaming architecture';
+  mark.textContent = MODEL_MARK;
+  mark.title = `${ROOT_NAME} architecture`;
   rail.append(mark);
 
   rail.append(
@@ -64,7 +64,7 @@ function renderCrumbs(mount, state, { onSelect }) {
   mount.replaceChildren();
 
   if (!state.selected) {
-    mount.append(crumb('system', 'Devcon 8 streaming', true));
+    mount.append(crumb('system', ROOT_NAME, true));
     return;
   }
 

@@ -10,6 +10,11 @@
  * Membership is listed explicitly here rather than as a field on each object,
  * so the whole answer to "what breaks together" is readable in one place.
  * `technology` is the exception: it derives from each object's own tech list.
+ *
+ * The definitions in this file are the Devcon 8 model's. The MVP model brings
+ * its own, in ./mvp/tags.js, and everything below them is shared: the builder
+ * takes an ordered list of definitions and fills in the two derived groups
+ * wherever that list asks for them.
  */
 
 import { RESILIENCE_TAGS, resilienceMembers } from './scale.js';
@@ -38,7 +43,7 @@ const BLAST_MEMBERS = {
   [BLAST.EXTERNAL]: ['av', 'swarm', 'viewers', 'browsernode'],
 };
 
-const PLACE_MEMBERS = {
+export const DEVCON_PLACE_MEMBERS = {
   venue: ['av', 'record'],
   cloud: [
     'sys', 'venueacl',
@@ -53,7 +58,7 @@ const PLACE_MEMBERS = {
 };
 
 /** Tag colours are single values that hold up on both the light and dark ground. */
-const GROUP_DEFS = [
+export const DEVCON_GROUP_DEFS = [
   {
     id: 'blast',
     name: 'Blast radius',
@@ -77,6 +82,11 @@ const GROUP_DEFS = [
     ],
     members: BLAST_MEMBERS,
   },
+  // The derived groups are ordered here rather than by the builder, so the
+  // bar reads the way a reliability review asks the questions: what breaks
+  // together, how many are there and what covers one, where does it run,
+  // what is it built of.
+  { derive: 'scale' },
   {
     id: 'place',
     name: 'Where it runs',
@@ -89,8 +99,9 @@ const GROUP_DEFS = [
       { id: 'device', name: 'Viewer device', color: '#2E8B63', hint: '70% of them a phone.' },
       { id: 'thirdparty', name: 'Third party', color: '#7C8B93', hint: 'Someone else runs it entirely.' },
     ],
-    members: PLACE_MEMBERS,
+    members: DEVCON_PLACE_MEMBERS,
   },
+  { derive: 'tech' },
 ];
 
 /**
@@ -136,28 +147,28 @@ export function technologyGroup(objects) {
   return { id: 'tech', name: 'Technology', hint: 'What each piece is actually built from.', tags, members };
 }
 
+/** The groups a definition list can ask to have built for it. */
+const DERIVED = { [SCALE_GROUP]: resilienceGroup, tech: technologyGroup };
+
 /**
  * Group definitions with per-tag object sets resolved and counted, in the
- * order a reliability review asks the questions: what breaks together, how
- * many are there and what covers one, where does it run, what is it built of.
+ * order the definitions give them. A definition asking to `derive` a group is
+ * filled in from the objects, so a model can say where the derived groups sit
+ * without knowing how either one is built. A tag no object carries is dropped
+ * rather than drawn as an empty chip.
  */
-export function buildTagGroups(objects) {
-  const statics = Object.fromEntries(GROUP_DEFS.map((g) => [g.id, g]));
-  const ordered = [
-    statics.blast,
-    resilienceGroup(objects),
-    statics.place,
-    technologyGroup(objects),
-  ];
-  return ordered.map((g) => ({
-    id: g.id,
-    name: g.name,
-    hint: g.hint,
-    tags: g.tags
-      .map((t) => ({ ...t, objects: (g.members[t.id] || []).filter((id) => objects[id]) }))
-      .filter((t) => t.objects.length)
-      .map((t) => ({ ...t, count: t.objects.length })),
-  }));
+export function buildTagGroups(objects, defs) {
+  return defs
+    .map((g) => (g.derive ? DERIVED[g.derive](objects) : g))
+    .map((g) => ({
+      id: g.id,
+      name: g.name,
+      hint: g.hint,
+      tags: g.tags
+        .map((t) => ({ ...t, objects: (g.members[t.id] || []).filter((id) => objects[id]) }))
+        .filter((t) => t.objects.length)
+        .map((t) => ({ ...t, count: t.objects.length })),
+    }));
 }
 
 /** Reverse index: object id to the tags it carries, per group. */
@@ -180,7 +191,7 @@ export function tagsByObject(groups) {
  * the bands gone from the nested view, this is what carries "these belong
  * together" at a glance.
  */
-export const PLACE_COLOUR = Object.freeze({
+export const DEVCON_PLACE_COLOUR = Object.freeze({
   venue: '#B8763A',
   cloud: '#3A7CB8',
   edge: '#17868C',
@@ -189,10 +200,9 @@ export const PLACE_COLOUR = Object.freeze({
   thirdparty: '#7C8B93',
 });
 
-const PLACE_OF = (() => {
+/** Object id to its place, given one model's membership lists. */
+export function placeIndex(members) {
   const out = {};
-  for (const [place, ids] of Object.entries(PLACE_MEMBERS)) for (const id of ids) out[id] = place;
-  return out;
-})();
-
-export const placeOf = (id) => PLACE_OF[id] || null;
+  for (const [place, ids] of Object.entries(members)) for (const id of ids) out[id] = place;
+  return (id) => out[id] || null;
+}

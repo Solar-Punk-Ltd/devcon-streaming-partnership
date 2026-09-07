@@ -25,12 +25,41 @@ const INITIAL = Object.freeze({
   inspector: true,
 });
 
+/**
+ * Query keys that are not state and must survive every rewrite.
+ *
+ * `toSearch` builds the query from scratch, so anything it does not know
+ * about is dropped. `model` is chosen once at load and never changes, which
+ * means dropping it would silently switch models on the first click: the URL
+ * loses `?model=mvp`, and the next reload shows the default.
+ *
+ * Read once here, before the first rewrite, so it survives being read back
+ * out of a URL this file has already edited.
+ */
+const CARRIED = ['model'];
+
+const carried = (() => {
+  const params = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
+  const out = {};
+  for (const key of CARRIED) {
+    const value = params.get(key);
+    if (value) out[key] = value;
+  }
+  return out;
+})();
+
 const LIST_KEYS = new Set(['opened', 'solo', 'hidden']);
 const BOOL_KEYS = new Set(['playing', 'tree', 'inspector', 'touring']);
 const NUM_KEYS = new Set(['step']);
 
-export function createStore(onChange) {
-  let state = { ...INITIAL, ...fromSearch(location.search) };
+/**
+ * @param {Function} onChange  called with the new state after every change
+ * @param {object} initial     per-model defaults, for the state the model
+ *                             decides rather than the reader: which box is
+ *                             open before anything has been clicked.
+ */
+export function createStore(onChange, initial = {}) {
+  let state = { ...INITIAL, ...initial, ...fromSearch(location.search) };
   let frozen = false;
 
   const notify = () => { if (!frozen) onChange(state); };
@@ -63,11 +92,11 @@ export function createStore(onChange) {
       return api.set({ [key]: next });
     },
 
-    reset: () => api.set({ ...INITIAL }),
+    reset: () => api.set({ ...INITIAL, ...initial }),
   };
 
   addEventListener('popstate', () => {
-    state = { ...INITIAL, ...fromSearch(location.search) };
+    state = { ...INITIAL, ...initial, ...fromSearch(location.search) };
     notify();
   });
 
@@ -102,8 +131,11 @@ export function fromSearch(search) {
 }
 
 /** Serialise state, omitting anything still at its default. */
-export function toSearch(state) {
+export function toSearch(state, carry = carried) {
   const params = new URLSearchParams();
+  // First, so a shared link still opens with the model in front of the state
+  // that only makes sense inside it.
+  for (const [key, value] of Object.entries(carry)) if (value) params.set(key, value);
   for (const [key, value] of Object.entries(state)) {
     if (!(key in INITIAL) || key === 'playing') continue;
     const initial = INITIAL[key];
