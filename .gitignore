@@ -15,7 +15,9 @@ terraform/rendered/*
 !terraform/rendered/.gitkeep
 terraform/**/*.tfplan
 terraform/**/tfplan
-# Written by terraform/scripts/allow-me.sh: an operator laptop address for one test window, never committed
-terraform/operator.auto.tfvars
+# Written by the allow-me.sh in each root: an operator laptop address for one test window, never
+# committed. The ** form covers both roots (git's a/**/b matches a/b too), so terraform/ and
+# terraform/vultr/ are both caught by this one line.
+terraform/**/operator.auto.tfvars
 crash.log
 crash.*.log
